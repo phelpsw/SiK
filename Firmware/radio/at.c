@@ -1,6 +1,7 @@
 // -*- Mode: C; c-basic-offset: 8; -*-
 //
 // Copyright (c) 2011 Michael Smith, All Rights Reserved
+// Copyright (c) 2013 Luke Hovington, All Rights Reserved
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -46,6 +47,9 @@ __pdata uint8_t pdata_canary = 0x41;
 __pdata char at_cmd[AT_CMD_MAXLEN + 1];
 __pdata uint8_t	at_cmd_len;
 
+// Index
+__pdata uint8_t		idx;
+
 // mode flags
 bool		at_mode_active;	///< if true, incoming bytes are for AT command
 bool		at_cmd_ready;	///< if true, at_cmd / at_cmd_len contain valid data
@@ -61,6 +65,7 @@ static void	at_s(void);
 static void	at_ampersand(void);
 static void	at_p(void);
 static void	at_plus(void);
+static void at_tilde(void);
 
 #pragma save
 #pragma nooverlay
@@ -207,15 +212,82 @@ at_timer(void)
 }
 #pragma restore
 
+uint8_t read_hex_nibble(const uint8_t c) __reentrant __nonbanked
+{
+    if ((c >='0') && (c <= '9'))
+    {
+        return c - '0';
+    }
+    else if ((c >='A') && (c <= 'F'))
+    {
+        return c - 'A' + 10;
+    }
+    else if ((c >='a') && (c <= 'f'))
+    {
+        return c - 'a' + 10;
+    }
+    else
+    {
+        printf("[%u] read_hex_nibble: Error char not in supported range",nodeId);
+        return 0;
+    }
+}
+
+uint8_t read_hex_byte(const uint8_t *buf) __reentrant __nonbanked
+{
+    uint8_t result;
+	
+    result = read_hex_nibble(buf[0]) << 4;
+    result += read_hex_nibble(buf[1]);
+    return result;
+}
+
+static uint32_t
+at_parse_number() __reentrant __nonbanked
+{
+	uint32_t	reg;
+	uint8_t		c;
+	
+	reg = 0;
+	for (;;) {
+		c = at_cmd[idx];
+		if (!isdigit(c))
+			break;
+		reg = (reg * 10) + (c - '0');
+		idx++;
+	}
+	return reg;
+}
+
 void
 at_command(void)
 {
+	__pdata uint16_t	destination;
+	
 	// require a command with the AT prefix
 	if (at_cmd_ready) {
 		if ((at_cmd_len >= 2) && (at_cmd[0] == 'R') && (at_cmd[1] == 'T')) {
 			// remote AT command - send it to the tdm
 			// system to send to the remote radio
-			tdm_remote_at();
+			
+			// get the register number first
+			idx = 3;
+			for (;;) {
+				if (at_cmd_len <= idx || at_cmd[idx] == ',')
+					break;
+				idx++;
+			}
+			
+			// If the RT command has a ',' followed by a destination
+			// send the RT packet to this node only
+			if(at_cmd[idx] == ',') {
+				at_cmd[idx++] = '\0';
+				destination = at_parse_number();
+				tdm_remote_at(destination);
+			}
+			else {
+				tdm_remote_at(0xFFFF); // 65535 = broadcast
+			}
 			at_cmd_len = 0;
 			at_cmd_ready = false;
 			return;
@@ -266,64 +338,41 @@ at_command(void)
 }
 
 static void
-at_ok(void)
+at_ok(void) __nonbanked
 {
-	printf("%s\n", "OK");
+	printf("[%u] OK\n", nodeId);
 }
 
 static void
-at_error(void)
+at_error(void) __nonbanked
 {
-	printf("%s\n", "ERROR");
-}
-
-__pdata uint8_t		idx;
-
-static uint32_t
-at_parse_number() __reentrant
-{
-	uint32_t	reg;
-	uint8_t		c;
-
-	reg = 0;
-	for (;;) {
-		c = at_cmd[idx];
-		if (!isdigit(c))
-			break;
-		reg = (reg * 10) + (c - '0');
-		idx++;
-	}
-	return reg;
+	printf("[%u] ERROR\n", nodeId);
 }
 
 static void
-at_i(void)
+at_i(void) __nonbanked
 {
+	__pdata uint8_t	id;
 	switch (at_cmd[3]) {
 	case '\0':
 	case '0':
-		printf("%s\n", g_banner_string);
+		printf("[%u] %s\n", nodeId, g_banner_string);
 		return;
 	case '1':
-		printf("%s\n", g_version_string);
+		printf("[%u] %s\n", nodeId, g_version_string);
 		return;
 	case '2':
-		printf("%u\n", BOARD_ID);
+		printf("[%u] %u\n", nodeId, BOARD_ID);
 		break;
 	case '3':
-		printf("%u\n", g_board_frequency);
+		printf("[%u] %u\n", nodeId, g_board_frequency);
 		break;
 	case '4':
-		printf("%u\n", g_board_bl_version);
+		printf("[%u] %u\n", nodeId, g_board_bl_version);
 		return;
 	case '5': {
-		enum ParamID id;
-		// convenient way of showing all parameters
 		for (id = 0; id < PARAM_MAX; id++) {
-			printf("S%u: %s=%lu\n", 
-			       (unsigned)id, 
-			       param_name(id), 
-			       (unsigned long)param_get(id));
+			param_print(id);
 		}
 		return;
 	}
@@ -333,6 +382,16 @@ at_i(void)
 	case '7':
 		tdm_show_rssi();
 		return;
+	case '8':
+		if (nodeId == 0)
+		{
+			printf("[%u] Sync: Base\n", nodeId);
+		}
+		else
+		{
+			printf("[%u] Sync: %u\n", nodeId, tdm_state_sync());
+		}
+		return;
 	default:
 		at_error();
 		return;
@@ -340,7 +399,7 @@ at_i(void)
 }
 
 static void
-at_s(void)
+at_s(void) __nonbanked
 {
 	__pdata uint8_t		sreg;
 	__pdata uint32_t	val;
@@ -357,7 +416,7 @@ at_s(void)
 	switch (at_cmd[idx]) {
 	case '?':
 		val = param_get(sreg);
-		printf("%lu\n", val);
+		printf("[%u] %lu\n", nodeId, val);
 		return;
 
 	case '=':
@@ -375,7 +434,7 @@ at_s(void)
 }
 
 static void
-at_ampersand(void)
+at_ampersand(void) __nonbanked
 {
 	switch (at_cmd[3]) {
 	case 'F':
@@ -405,10 +464,6 @@ at_ampersand(void)
 		at_error();
 		break;
 
-	case 'P':
-		tdm_change_phase();
-		break;
-
 	case 'T':
 		// enable test modes
 		if (!strcmp(at_cmd + 4, "")) {
@@ -432,7 +487,7 @@ at_ampersand(void)
 }
 
 static void
-at_p (void)
+at_p (void) __nonbanked
 {
 #if PIN_MAX > 0
 	__pdata uint8_t pinId;
@@ -440,7 +495,7 @@ at_p (void)
 	{
 		for (pinId = 0; pinId < PIN_MAX; pinId++)
 		{
-			printf("Pin:%d ", pinId);
+			printf("[%u] Pin:%d ",nodeId, pinId);
 			if (pins_user_get_io(pinId))
 				printf("Output ");
 			else
@@ -456,22 +511,22 @@ at_p (void)
 	}
 	
 	pinId = at_cmd[5] - '0';
-	
+
 	switch (at_cmd[3]) {
 			
-			// Set pin to output, turn mirroring off pulling pin to ground
+		// Set pin to output, turn mirroring off pulling pin to ground
 		case 'O':
 			pins_user_set_io(pinId, PIN_OUTPUT);
 			break;
-			
-			// Need to figure out how to set pins to Input/Output
+
+		// Need to figure out how to set pins to Input/Output
 		case 'I':
 			pins_user_set_io(pinId, PIN_INPUT);
 			break;
-			
+		
 		case 'R':
 			if(pins_user_get_io(pinId) == PIN_INPUT)
-				printf("val:%u\n", pins_user_get_adc(pinId));
+				printf("[%u] val:%u\n", nodeId, pins_user_get_adc(pinId));
 			else
 				at_error();
 			return;
@@ -496,9 +551,9 @@ at_p (void)
 }
 
 static void
-at_plus(void)
+at_plus(void) __nonbanked
 {
-#ifdef BOARD_rfd900a
+#if defined BOARD_rfd900a || defined INCLUDE_ENCRYPTION
 	__pdata uint8_t		creg;
 	__pdata uint32_t	val;
 
@@ -508,6 +563,7 @@ at_plus(void)
 
 	switch (at_cmd[3])
 	{
+#ifdef BOARD_rfd900a
 	case 'P': // AT+P=x set power level pwm to x immediately
 		if (at_cmd[4] != '=')
 		{
@@ -546,7 +602,32 @@ at_plus(void)
 			at_error();
 		}
 		return;
+#endif // BOARD_rfd900a
+//#ifdef INCLUDE_ENCRYPTION
+//	case 'E': // AT+E= Encyrption key for the radio
+//			__pdata uint8_t		i=0;
+//			__pdata uint8_t		val = (uint8_t)(param_get(PARAM_ENCRYPTION)/8);
+//			
+//			if(at_cmd[4] != '=' || val == 0)
+//			{
+//				at_error();
+//				return;
+//			}
+//			printf("%d,%f",i,encryption_key);
+//			for(i=0; i<val; i++)
+//			{
+//				// The hex number starts on the 5th char
+//				// For each 8bits we need to read 2 chars
+//				EncryptionKey[i] = read_hex_byte(at_cmd+5+(i*2));
+//			}
+//			
+//			if(param_encryptkey_set(encryption_key))
+//			{
+//				at_ok();
+//				return;
+//			}
+//#endif // INCLUDE_ENCRYPTION
 	}
-#endif //BOARD_rfd900a
+#endif // BOARD_rfd900a || INCLUDE_ENCRYPTION
 	at_error();
 }

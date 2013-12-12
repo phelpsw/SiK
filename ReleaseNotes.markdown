@@ -1,14 +1,18 @@
 #Release Notes:
 
-##SiK 1.8:
+##MP SiK 2.3:
 
-###Alterations
-* Golay removed, can be added back using uncommenting #define in golay23.h
-* ECC - Setting ECC now causes a error due to it being removed
+###Bug Fixes
+1. Watchdog turned off due to odd behaviour
+2. RTI5 returns full list of commands (Watchdog problem)
+3. RT&W should be stable now (Watchdog problem)
+4. Tweeking Radio timing to improve preformace
 
 ###NEW FEATURES!!
-* Added support for new CPU Si102x/3x (For new Product RFD900u)
-* Users can now controll unused pins. This can be preformed by the following commands
+
+1. ATI8 Returns if the node is sync'd with the base (Does not work on base node)
+
+2. Users can now controll unused pins. This can be preformed by the following commands
 
 Command       | Function | Description
 ------------- | ---------|-------------
@@ -19,9 +23,8 @@ ATPO=2        | Output   | Set Pin 2 to Output (Output's by Default can only be 
 ATPC=2,1      | Control  | Turn pin 2 on  - Output Mode / Set internal pull up resistor - Input Mode 
 ATPC=2,0      | Control  | Turn pin 2 off - Output Mode / Set internal pull down resistor - Input Mode
 
-Mapping between the pin numbers above and the port number are below
+The mapping between the pin numbers above and the port number are below
 
-######RFD900
 Pin  | Port
 ---- | ----
 0    | 2.3
@@ -31,15 +34,12 @@ Pin  | Port
 4    | 2.6
 5    | 0.1
 
-######RFD900u
-Pin  | Port
----- | ----
-0    | 1.0
-1    | 1.1
+##MP SiK 2.2:
+###Lookup Changes
 
-##SiK 1.7:
+##MP SiK 2.1:
+###First Release SiK MultiPoint Firmware
 
-###Improvements
-* Altered timing for better throughput
-* Removed support for MAVLink 0.9 support freeing up code space
-* Updated Config to use a CRC instead of the XOR 
+###NEW FEATURES!!
+1. Support for Multinode Networks (more than 2!)
+2. Improved Radio stack to minimise packet delays

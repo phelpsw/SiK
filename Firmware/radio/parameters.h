@@ -46,23 +46,29 @@
 ///   parameters.c:param_check()
 ///
 enum ParamID {
-	PARAM_FORMAT = 0,		// Must always be parameter 0
-	PARAM_SERIAL_SPEED,		// BAUD_RATE_* constant
-	PARAM_AIR_SPEED,		// over the air baud rate
-	PARAM_NETID,			// network ID
-	PARAM_TXPOWER,			// transmit power (dBm)
-	PARAM_ECC,				// ECC using golay encoding
-	PARAM_MAVLINK,			// MAVLink framing, 0=ignore, 1=use, 2=rc-override
-	PARAM_OPPRESEND,		// opportunistic resend
-	PARAM_MIN_FREQ,			// min frequency in MHz
-	PARAM_MAX_FREQ,			// max frequency in MHz
-	PARAM_NUM_CHANNELS,		// number of hopping channels
-	PARAM_DUTY_CYCLE,		// duty cycle (percentage)
-	PARAM_LBT_RSSI,			// listen before talk threshold
-	PARAM_MANCHESTER,		// enable manchester encoding
-	PARAM_RTSCTS,			// enable hardware flow control
-	PARAM_MAX_WINDOW,		// The maximum window size allowed
-	PARAM_MAX				// must be last
+        PARAM_FORMAT = 0,     // Must always be parameter 0
+        PARAM_SERIAL_SPEED,   // BAUD_RATE_* constant
+        PARAM_AIR_SPEED,      // over the air baud rate
+        PARAM_NETID,          // network ID
+        PARAM_TXPOWER,        // transmit power (dBm)
+        PARAM_ECC,            // ECC using golay encoding
+        PARAM_MAVLINK,        // MAVLink framing
+        PARAM_OPPRESEND,      // opportunistic resend
+        PARAM_MIN_FREQ,       // min frequency in MHz
+        PARAM_MAX_FREQ,       // max frequency in MHz
+        PARAM_NUM_CHANNELS,   // number of hopping channels
+        PARAM_DUTY_CYCLE,     // duty cycle (percentage)
+        PARAM_LBT_RSSI,       // listen before talk threshold
+        PARAM_MANCHESTER,     // enable manchester encoding
+        PARAM_RTSCTS,         // enable hardware flow control
+        PARAM_NODEID,         // node ID
+        PARAM_NODEDESTINATION,// packet destination
+        PARAM_SYNCANY,        // Let this node sync from any in the network not just the base
+        PARAM_NODECOUNT,      // number of sequential nodes in the network
+#ifdef INCLUDE_ENCRYPTION
+		PARAM_ENCRYPTION,     // no Enycryption (0), 128 or 256 bit key
+#endif
+        PARAM_MAX             // must be last
 };
 
 #define PARAM_FORMAT_CURRENT	0x1BUL				///< current parameter format ID
@@ -100,7 +106,7 @@ extern param_t param_get(__data enum ParamID param);
 /// @return			The parameter ID, or PARAM_MAX if the
 ///				parameter is not known.
 ///
-extern enum ParamID param_id(__data char * __pdata name);
+//extern enum ParamID param_id(__data char * __pdata name);
 
 /// Return the name of a parameter.
 ///
@@ -126,8 +132,18 @@ extern void param_save(void);
 ///
 extern void param_default(void);
 
+/// List current parameter
+///
+extern void param_print(__data uint8_t id);
+
 /// convenient routine to constrain parameter values
 uint32_t constrain(__pdata uint32_t v, __pdata uint32_t min, __pdata uint32_t max);
+
+#ifdef INCLUDE_ENCRYPTION
+__xdata uint8_t* param_encryptkey_get(void);
+void param_encryptkey_set(__xdata uint8_t *key);
+extern SEGMENT_VARIABLE (EncryptionKey[32], U8, SEG_XDATA);
+#endif
 
 #ifdef BOARD_rfd900a
 extern bool calibration_set(uint8_t idx, uint8_t value) __reentrant;

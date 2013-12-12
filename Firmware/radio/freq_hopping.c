@@ -42,17 +42,8 @@ __pdata uint8_t num_fh_channels;
 /// whether we current have good lock with the other end
 static bool have_radio_lock;
 
-/// current transmit channel
-/// This changes every time the TDM transmit window opens or closes,
-/// regardless of our lock state
-__pdata static volatile uint8_t transmit_channel;
-
-/// current receive channel
-/// When we have good lock with the other radio the receive channel
-/// follows the transmit channel. When we don't have lock the receive
-/// channel only changes
-/// very slowly - it moves only when the transmit channel wraps
-__pdata static volatile uint8_t receive_channel;
+/// current channel
+__pdata static volatile uint8_t fhop_channel;
 
 /// map between hopping channel numbers and physical channel numbers
 __xdata static uint8_t channel_map[MAX_FREQ_CHANNELS];
@@ -60,7 +51,7 @@ __xdata static uint8_t channel_map[MAX_FREQ_CHANNELS];
 // a vary simple array shuffle
 // based on shuffle from
 // http://benpfaff.org/writings/clc/shuffle.html
-static inline void shuffle(__xdata uint8_t *array, uint8_t n)
+static inline void shuffle(__xdata uint8_t *array, uint8_t n) __nonbanked
 {
 	uint8_t i;
 	for (i = 0; i < n - 1; i++) {
@@ -85,40 +76,50 @@ fhop_init(uint16_t netid)
 	shuffle(channel_map, num_fh_channels);
 }
 
-// tell the TDM code what channel to transmit on
-uint8_t 
-fhop_transmit_channel(void)
-{
-	return channel_map[transmit_channel];
-}
-
 // tell the TDM code what channel to receive on
 uint8_t 
-fhop_receive_channel(void)
+fhop_receive_channel(void) __nonbanked
 {
-	return channel_map[receive_channel];
+	return channel_map[fhop_channel];
+}
+
+// tell the TDM code what channel to transmit on
+uint8_t 
+fhop_sync_channel(void) __nonbanked
+{
+	// Fixed sync channel
+	return channel_map[SYNC_CHANNEL % num_fh_channels];
+}
+
+// get the current transmit channel (NOT the map frequency)
+uint8_t
+get_transmit_channel(void) __nonbanked
+{
+	return fhop_channel;
+}
+
+// set the current transmit channel (NOT the map frequency)
+void
+set_transmit_channel(uint8_t channel) __nonbanked
+{
+	fhop_channel = channel;
 }
 
 // called when the transmit windows changes owner
 void 
-fhop_window_change(void)
+fhop_window_change(void) __nonbanked
 {
-	transmit_channel = (transmit_channel + 1) % num_fh_channels;
-	if (have_radio_lock) {
-		// when we have lock, the receive channel follows the
-		// transmit channel
-		receive_channel = transmit_channel;
-	} else if (transmit_channel == 0) {
-		// when we don't have lock, the receive channel only
-		// changes when the transmit channel wraps
-		receive_channel = (receive_channel + 1) % num_fh_channels;
+	fhop_channel = (fhop_channel + 1) % num_fh_channels;
+	if (!have_radio_lock) {
+		// when we don't have lock, listen on the sync channel
+		fhop_channel = SYNC_CHANNEL % num_fh_channels;
 		debug("Trying RCV on channel %d\n", (int)receive_channel);
 	}
 }
 
 // called when we get or lose radio lock
 void 
-fhop_set_locked(bool locked)
+fhop_set_locked(bool locked) __nonbanked
 {
 #if DEBUG
 	if (locked && !have_radio_lock) {
@@ -126,14 +127,5 @@ fhop_set_locked(bool locked)
 	}
 #endif
 	have_radio_lock = locked;
-	if (have_radio_lock) {
-		// we have just received a packet, so we know the
-		// other radios transmit channel must be our receive
-		// channel
-		transmit_channel = receive_channel;
-	} else {
-		// try the next receive channel
-		receive_channel = (receive_channel+1) % num_fh_channels;
-	}
 }
 

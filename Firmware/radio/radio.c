@@ -40,6 +40,7 @@ __pdata uint8_t receive_packet_length;
 __pdata uint8_t partial_packet_length;
 __pdata uint8_t last_rssi;
 __pdata uint8_t netid[2];
+__pdata uint16_t nodeId;
 
 static volatile __bit packet_received;
 static volatile __bit preamble_detected;
@@ -49,12 +50,12 @@ __pdata struct radio_settings settings;
 
 // internal helper functions
 //
-static void	register_write(uint8_t reg, uint8_t value) __reentrant;
-static uint8_t	register_read(uint8_t reg);
-static bool	software_reset(void);
-static void	set_frequency_registers(uint32_t frequency);
-static uint32_t scale_uint32(uint32_t value, uint32_t scale);
-static void	clear_status_registers(void);
+static void	register_write(uint8_t reg, uint8_t value) __reentrant __nonbanked;
+static uint8_t	register_read(uint8_t reg) __nonbanked;
+static bool	software_reset(void) __nonbanked;
+static void	set_frequency_registers(uint32_t frequency) __nonbanked;
+static uint32_t scale_uint32(uint32_t value, uint32_t scale) __nonbanked;
+static void	clear_status_registers(void) __nonbanked;
 
 // save and restore radio interrupt. We use this rather than
 // __critical to ensure we don't disturb the timer interrupt at all.
@@ -74,7 +75,7 @@ static void	clear_status_registers(void);
 // returns true on success, false on no packet available
 //
 bool
-radio_receive_packet(uint8_t *length, __xdata uint8_t * __pdata buf)
+radio_receive_packet(uint8_t *length, __xdata uint8_t * __pdata buf) __nonbanked
 {
 #ifdef INCLUDE_GOLAY
 	__xdata uint8_t gout[3];
@@ -192,7 +193,7 @@ failed:
 // write to the radios transmit FIFO
 //
 static void
-radio_write_transmit_fifo(register uint8_t n, __xdata uint8_t * __pdata buffer)
+radio_write_transmit_fifo(register uint8_t n, __xdata uint8_t * __pdata buffer) __nonbanked
 {
 	RADIO_PAGE();
 	
@@ -217,7 +218,7 @@ radio_write_transmit_fifo(register uint8_t n, __xdata uint8_t * __pdata buffer)
 // check if a packet is being received
 //
 bool
-radio_receive_in_progress(void)
+radio_receive_in_progress(void) __nonbanked
 {
 	if (packet_received ||
 		partial_packet_length != 0) {
@@ -235,7 +236,7 @@ radio_receive_in_progress(void)
 // a packet may be coming in
 //
 bool
-radio_preamble_detected(void)
+radio_preamble_detected(void) __nonbanked
 {
 	EX0_SAVE_DISABLE;
 	if (preamble_detected) {
@@ -252,7 +253,7 @@ radio_preamble_detected(void)
 // return the RSSI from the last packet
 //
 uint8_t
-radio_last_rssi(void)
+radio_last_rssi(void) __nonbanked
 {
 	return last_rssi;
 }
@@ -260,7 +261,7 @@ radio_last_rssi(void)
 // return the current signal strength, for LBT
 //
 uint8_t
-radio_current_rssi(void)
+radio_current_rssi(void) __nonbanked
 {
 	return register_read(EZRADIOPRO_RECEIVED_SIGNAL_STRENGTH_INDICATOR);
 }
@@ -268,7 +269,7 @@ radio_current_rssi(void)
 // return the actual air data rate in BPS
 //
 uint8_t
-radio_air_rate(void)
+radio_air_rate(void) __nonbanked
 {
 	return settings.air_data_rate;
 }
@@ -276,7 +277,7 @@ radio_air_rate(void)
 // clear the transmit FIFO
 //
 static void
-radio_clear_transmit_fifo(void)
+radio_clear_transmit_fifo(void) __nonbanked
 {
 	register uint8_t control;
 	control = register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2);
@@ -288,7 +289,7 @@ radio_clear_transmit_fifo(void)
 // clear the receive FIFO
 //
 static void
-radio_clear_receive_fifo(void) __reentrant
+radio_clear_receive_fifo(void) __reentrant __nonbanked
 {
 	register uint8_t control;
 	control = register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2);
@@ -305,7 +306,7 @@ radio_clear_receive_fifo(void) __reentrant
 // @return	    true if packet sent successfully
 //
 static bool
-radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint16_t timeout_ticks)
+radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint16_t timeout_ticks) __nonbanked
 {
 	__pdata uint16_t tstart;
 	bool transmit_started;
@@ -337,12 +338,19 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 
 	// start TX
 	register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_1, EZRADIOPRO_TXON | EZRADIOPRO_XTON);
-
+#ifdef DEBUG_PINS_RADIO_TX_RX
+	P2 |=  0x01;
+#endif // DEBUG_PINS_RADIO_TX_RX
 	// wait for transmit complete or timeout
 	tstart = timer2_tick();
 	while ((uint16_t)(timer2_tick() - tstart) < timeout_ticks) {
 		__data uint8_t status;
 
+#ifdef WATCH_DOG_ENABLE
+		// Reset Watchdog
+		PCA0CPH5 = 0;
+#endif //WATCH_DOG_ENABLE
+		
 		// see if we can put some more bytes into the FIFO
 		status = register_read(EZRADIOPRO_INTERRUPT_STATUS_1);
 		if (transmit_started && length != 0 && (status & EZRADIOPRO_ITXFFAEM)) {
@@ -382,6 +390,9 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 			if (errors.tx_errors != 0xFFFF) {
 				errors.tx_errors++;
 			}
+#ifdef DEBUG_PINS_RADIO_TX_RX
+			P2 &= ~0x01;
+#endif // DEBUG_PINS_RADIO_TX_RX
 			return false;
 		}
 
@@ -401,19 +412,28 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 				if (errors.tx_errors != 0xFFFF) {
 					errors.tx_errors++;
 				}
+#ifdef DEBUG_PINS_RADIO_TX_RX
+				P2 &= ~0x01;
+#endif // DEBUG_PINS_RADIO_TX_RX
 				return false;
 			}
+#ifdef DEBUG_PINS_RADIO_TX_RX
+			P2 &= ~0x01;
+#endif // DEBUG_PINS_RADIO_TX_RX
 			return true;			
 		}
 
 	}
+#ifdef DEBUG_PINS_RADIO_TX_RX
+	P2 &= ~0x01;
+#endif // DEBUG_PINS_RADIO_TX_RX
 
 	// transmit timeout ... clear the FIFO
 	debug("TX timeout %u ts=%u tn=%u len=%u\n",
-		timeout_ticks,
-		tstart,
-		timer2_tick(),
-		(unsigned)length);
+	       timeout_ticks,
+	       tstart,
+	       timer2_tick(),
+	       (unsigned)length);
 	if (errors.tx_errors != 0xFFFF) {
 		errors.tx_errors++;
 	}
@@ -431,7 +451,7 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 // @return	    true if packet sent successfully
 //
 static bool
-radio_transmit_golay(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint16_t timeout_ticks)
+radio_transmit_golay(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint16_t timeout_ticks) __nonbanked
 {
 	__pdata uint16_t crc;
 	__xdata uint8_t gin[3];
@@ -482,7 +502,7 @@ radio_transmit_golay(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint
 // @return	    true if packet sent successfully
 //
 bool
-radio_transmit(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint16_t timeout_ticks)
+radio_transmit(uint8_t length, __xdata uint8_t * __pdata buf, uint16_t destination, __pdata uint16_t timeout_ticks) __nonbanked
 {
 	bool ret;
 	EX0_SAVE_DISABLE;
@@ -490,6 +510,9 @@ radio_transmit(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint16_t t
 #ifdef _BOARD_RFD900A
 	PA_ENABLE = 1;		// Set PA_Enable to turn on PA prior to TX cycle
 #endif
+	
+	register_write(EZRADIOPRO_TRANSMIT_HEADER_3, destination >> 8);
+	register_write(EZRADIOPRO_TRANSMIT_HEADER_2, destination & 0xFF);
 	
 #ifdef INCLUDE_GOLAY
 	if (!feature_golay) {
@@ -512,7 +535,7 @@ radio_transmit(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint16_t t
 // put the radio in receive mode
 //
 bool
-radio_receiver_on(void)
+radio_receiver_on(void) __nonbanked
 {
 	EX0 = 0;
 
@@ -542,7 +565,7 @@ radio_receiver_on(void)
 // initialise the radio hardware
 //
 bool
-radio_initialise(void)
+radio_initialise(void) __nonbanked
 {
 	uint8_t status;
 
@@ -588,7 +611,7 @@ radio_initialise(void)
 // set the transmit frequency
 //
 bool
-radio_set_frequency(__pdata uint32_t value)
+radio_set_frequency(__pdata uint32_t value) __nonbanked
 {
 	if (value < 240000000UL || value > 935000000UL) {
 		return false;
@@ -602,7 +625,7 @@ radio_set_frequency(__pdata uint32_t value)
 // set the channel spacing
 //
 bool
-radio_set_channel_spacing(__pdata uint32_t value)
+radio_set_channel_spacing(__pdata uint32_t value) __nonbanked
 {
 	if (value > 2550000L)
 		return false;
@@ -615,7 +638,7 @@ radio_set_channel_spacing(__pdata uint32_t value)
 // set the tx/rx frequency channel
 //
 void
-radio_set_channel(uint8_t channel)
+radio_set_channel(uint8_t channel) __nonbanked
 {
 	if (channel != settings.current_channel) {
 		settings.current_channel = channel;
@@ -627,7 +650,7 @@ radio_set_channel(uint8_t channel)
 // get the tx/rx frequency channel
 //
 uint8_t 
-radio_get_channel(void)
+radio_get_channel(void) __nonbanked
 {
 	return settings.current_channel;
 }
@@ -726,7 +749,7 @@ __code static const uint8_t reg_table_915[NUM_RADIO_REGISTERS][NUM_DATA_RATES] =
 // configure radio based on the air data rate
 //
 bool
-radio_configure(__pdata uint8_t air_rate)
+radio_configure(__pdata uint8_t air_rate) __nonbanked
 {
 	__pdata uint8_t i, rate_selection, control;
 
@@ -781,11 +804,11 @@ radio_configure(__pdata uint8_t air_rate)
 		register_write(EZRADIOPRO_DATA_ACCESS_CONTROL,
 			       EZRADIOPRO_ENPACTX | 
 			       EZRADIOPRO_ENPACRX);
-		// 2 sync bytes and no header bytes
-		register_write(EZRADIOPRO_HEADER_CONTROL_2, EZRADIOPRO_HDLEN_0BYTE | EZRADIOPRO_SYNCLEN_2BYTE);
+		// 2 sync bytes and 2 header bytes
+		register_write(EZRADIOPRO_HEADER_CONTROL_2, EZRADIOPRO_HDLEN_2BYTE | EZRADIOPRO_SYNCLEN_2BYTE);
 
-		// no header check
-		register_write(EZRADIOPRO_HEADER_CONTROL_1, 0x00);
+		// check 2 bytes of header and allow broadcast on 2 bytes
+		register_write(EZRADIOPRO_HEADER_CONTROL_1, 0xCC);
 	} else {
 #endif // INCLUDE_GOLAY
 		register_write(EZRADIOPRO_DATA_ACCESS_CONTROL,
@@ -793,16 +816,17 @@ radio_configure(__pdata uint8_t air_rate)
 			       EZRADIOPRO_ENPACRX |
 			       EZRADIOPRO_ENCRC |
 			       EZRADIOPRO_CRC_16);
-		// 2 sync bytes and 2 header bytes
-		register_write(EZRADIOPRO_HEADER_CONTROL_2, EZRADIOPRO_HDLEN_2BYTE | EZRADIOPRO_SYNCLEN_2BYTE);
-		// check 2 bytes of header
-		register_write(EZRADIOPRO_HEADER_CONTROL_1, 0x0C);
-		register_write(EZRADIOPRO_HEADER_ENABLE_3, 0xFF);
-		register_write(EZRADIOPRO_HEADER_ENABLE_2, 0xFF);
-#ifdef INCLUDE_GOLAY
+		// 2 sync bytes and 4 header bytes
+		register_write(EZRADIOPRO_HEADER_CONTROL_2, EZRADIOPRO_HDLEN_4BYTE | EZRADIOPRO_SYNCLEN_2BYTE);
+		// check 4 bytes of header and allow broadcast on 2 bytes
+		register_write(EZRADIOPRO_HEADER_CONTROL_1, 0xCF);
+		register_write(EZRADIOPRO_HEADER_ENABLE_1, 0xFF);
+		register_write(EZRADIOPRO_HEADER_ENABLE_0, 0xFF);
 	}
 #endif // INCLUDE_GOLAY
-
+	// Headers 2/3 are always in use..
+	register_write(EZRADIOPRO_HEADER_ENABLE_3, 0xFF);
+	register_write(EZRADIOPRO_HEADER_ENABLE_2, 0xFF);
 
 	// set FIFO limits to allow for sending larger than 64 byte packets
 	register_write(EZRADIOPRO_TX_FIFO_CONTROL_1, TX_FIFO_THRESHOLD_HIGH);
@@ -894,7 +918,7 @@ radio_configure(__pdata uint8_t air_rate)
 // set the radio transmit power (in dBm)
 //
 void 
-radio_set_transmit_power(uint8_t power)
+radio_set_transmit_power(uint8_t power) __nonbanked
 {
 	uint8_t i;
 
@@ -927,7 +951,7 @@ radio_set_transmit_power(uint8_t power)
 // get the current transmit power (in dBm)
 //
 uint8_t 
-radio_get_transmit_power(void)
+radio_get_transmit_power(void) __nonbanked
 {
 	return settings.transmit_power;
 }
@@ -935,20 +959,29 @@ radio_get_transmit_power(void)
 // setup a 16 bit network ID
 //
 void
-radio_set_network_id(uint16_t id)
+radio_set_network_id(uint16_t id) __nonbanked
 {
 	netid[0] = id&0xFF;
 	netid[1] = id>>8;
 	if (!feature_golay) {
 		// when not using golay encoding we use the hardware
 		// headers for network ID
-		register_write(EZRADIOPRO_TRANSMIT_HEADER_3, id >> 8);
-		register_write(EZRADIOPRO_TRANSMIT_HEADER_2, id & 0xFF);
-		register_write(EZRADIOPRO_CHECK_HEADER_3, id >> 8);
-		register_write(EZRADIOPRO_CHECK_HEADER_2, id & 0xFF);
+		register_write(EZRADIOPRO_TRANSMIT_HEADER_1, id >> 8);
+		register_write(EZRADIOPRO_TRANSMIT_HEADER_0, id & 0xFF);
+		register_write(EZRADIOPRO_CHECK_HEADER_1, id >> 8);
+		register_write(EZRADIOPRO_CHECK_HEADER_0, id & 0xFF);
 	}
 }
 
+// setup a 16 bit node ID
+//
+void
+radio_set_node_id(uint16_t id) __nonbanked
+{
+	nodeId = id;
+	register_write(EZRADIOPRO_CHECK_HEADER_3, nodeId>>8);
+	register_write(EZRADIOPRO_CHECK_HEADER_2, nodeId&0xFF);
+}
 
 /// write to a radio register
 ///
@@ -956,7 +989,7 @@ radio_set_network_id(uint16_t id)
 /// @param value		The value to write
 ///
 static void
-register_write(uint8_t reg, uint8_t value) __reentrant
+register_write(uint8_t reg, uint8_t value) __reentrant __nonbanked
 {
 	EX0_SAVE_DISABLE;
 
@@ -983,7 +1016,7 @@ register_write(uint8_t reg, uint8_t value) __reentrant
 /// @return			The value read
 ///
 static uint8_t
-register_read(uint8_t reg) __reentrant
+register_read(uint8_t reg) __reentrant __nonbanked
 {
 	register uint8_t value;
 	EX0_SAVE_DISABLE;
@@ -1010,7 +1043,7 @@ register_read(uint8_t reg) __reentrant
 ///
 /// @param n			The number of bytes to read
 static void
-read_receive_fifo(register uint8_t n, __xdata uint8_t * buf) __reentrant
+read_receive_fifo(register uint8_t n, __xdata uint8_t * buf) __reentrant __nonbanked
 {
 	RADIO_PAGE();
 	NSS1 = 0;				// drive NSS low
@@ -1034,7 +1067,7 @@ read_receive_fifo(register uint8_t n, __xdata uint8_t * buf) __reentrant
 /// clear interrupts by reading the two status registers
 ///
 static void
-clear_status_registers(void)
+clear_status_registers(void) __nonbanked
 {
 	register_read(EZRADIOPRO_INTERRUPT_STATUS_1);
 	register_read(EZRADIOPRO_INTERRUPT_STATUS_2);
@@ -1047,7 +1080,7 @@ clear_status_registers(void)
 /// @return			value / scale, rounded to the nearest integer
 ///
 static uint32_t
-scale_uint32(__pdata uint32_t value, __pdata uint32_t scale)
+scale_uint32(__pdata uint32_t value, __pdata uint32_t scale) __nonbanked
 {
 	return (value + (scale >> 1)) / scale;
 }
@@ -1057,7 +1090,7 @@ scale_uint32(__pdata uint32_t value, __pdata uint32_t scale)
 ///
 /// @return			True if the radio reset correctly
 static bool
-software_reset(void)
+software_reset(void) __nonbanked
 {
 	uint8_t status;
 
@@ -1097,7 +1130,7 @@ software_reset(void)
 ///
 /// @param frequency		The frequency to set, in Hz
 static void
-set_frequency_registers(__pdata uint32_t frequency)
+set_frequency_registers(__pdata uint32_t frequency) __nonbanked
 {
 	uint8_t band;
 	__pdata uint16_t carrier;
@@ -1131,7 +1164,7 @@ set_frequency_registers(__pdata uint32_t frequency)
 /// @return		temperature in degrees C
 ///
 int16_t
-radio_temperature(void)
+radio_temperature(void) __nonbanked
 {
 	register int16_t temp_local;
 
@@ -1148,7 +1181,7 @@ radio_temperature(void)
 /// Turn off radio diversity
 ///
 void
-radio_set_diversity(bool enable)
+radio_set_diversity(bool enable) __nonbanked
 {
 	if (enable)
 	{
@@ -1177,7 +1210,9 @@ radio_set_diversity(bool enable)
 INTERRUPT(Receiver_ISR, INTERRUPT_INT0)
 {
 	__data uint8_t status, status2;
-
+#ifdef DEBUG_PINS_RADIO_TX_RX
+	P2 |=  0x02;
+#endif // DEBUG_PINS_RADIO_TX_RX
 	status2 = register_read(EZRADIOPRO_INTERRUPT_STATUS_2);
 	status  = register_read(EZRADIOPRO_INTERRUPT_STATUS_1);
 
@@ -1224,6 +1259,9 @@ INTERRUPT(Receiver_ISR, INTERRUPT_INT0)
 		// go into tune mode
 		register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_1, EZRADIOPRO_PLLON);
 	}
+#ifdef DEBUG_PINS_RADIO_TX_RX
+	P2 &= ~0x02;
+#endif // DEBUG_PINS_RADIO_TX_RX
 	return;
 
 rxfail:
@@ -1231,5 +1269,8 @@ rxfail:
 		errors.rx_errors++;
 	}
 	radio_receiver_on();
+#ifdef DEBUG_PINS_RADIO_TX_RX
+	P2 &= ~0x02;
+#endif // DEBUG_PINS_RADIO_TX_RX
 }
 

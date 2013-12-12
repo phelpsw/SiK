@@ -1,5 +1,6 @@
 // -*- Mode: C; c-basic-offset: 8; -*-
 //
+// Copyright (c) 2013 Luke Hovington, All Rights Reserved
 // Copyright (c) 2012 Andrew Tridgell, All Rights Reserved
 //
 // Redistribution and use in source and binary forms, with or without
@@ -35,30 +36,49 @@
 #ifndef _TDM_H_
 #define _TDM_H_
 
+#include <stdbool.h>
+
+// Debug pins
+//#define DEBUG_PINS_YIELD // P2.6
+//#define DEBUG_PINS_SYNC  // P0.1
+//#define DEBUG_PINS_TRANSMIT_RECEIVE // P2.2
+//#define DEBUG_PINS_TX_RX_STATE // P2.3
+
 // Sync Logic on Pin // P2.6
 //#define TDM_SYNC_LOGIC
+
+// Hard coded for the inital testing, need to figure out how this could be changed on the fly later down the track
+// Maybe a new command seprate from the AT? Without entering +++ mode? more thought needed
+#define BASE_NODEID 0
+#define USE_TICK_YIELD 1
 
 #ifdef TDM_SYNC_LOGIC
 SBIT (TDM_SYNC_PIN, SFR_P2, 6);
 #endif // TDM_SYNC_LOGIC
 
 /// initialise tdm subsystem
-///
 extern void tdm_init(void);
 
-// tdm main loop
-///
+/// tdm main loop
 extern void tdm_serial_loop(void);
 
+/// tdm sync state
+extern bool tdm_state_sync();
+
+/// setup a 16 bit node count
+extern void tdm_set_node_count(__pdata uint16_t count);
+
+/// setup a 16 bit node destination
+extern void tdm_set_node_destination(__pdata uint16_t destination);
+
+/// setup if the node can sync from any
+extern void tdm_set_sync_any(__pdata uint8_t any);
+
 /// report tdm timings
-///
 extern void tdm_report_timing(void);
 
 /// dispatch a remote AT command
-extern void tdm_remote_at(void);
-
-/// change tdm phase (for testing recovery)
-extern void tdm_change_phase(void);
+extern void tdm_remote_at(__pdata uint16_t destination);
 
 /// show RSSI information
 extern void tdm_show_rssi(void);

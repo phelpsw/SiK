@@ -45,7 +45,6 @@
 #define FLASH_PAGE_SHIFT	10
 #define FLASH_APP_START		0x0400		// 1 page reserved for bootloader
 
-
 #ifdef BOARD_rfd900u
 // WARNING You need to select Bank 3 for these address to work. (p125)
 #define FLASH_INFO_PAGE		0xFC00		// 1 page reserved for bootloader (In Bank3)
@@ -56,8 +55,8 @@
 
 #else  // BOARD_rfd900u (p144)
 
-#define FLASH_INFO_PAGE		0xf800		// 1 page reserved for bootloader
-#define FLASH_LOCK_BYTE		0xfbff
+#define FLASH_INFO_PAGE		0xF800		// 1 page reserved for bootloader
+#define FLASH_LOCK_BYTE		0xFBFF
 #define FLASH_SIGNATURE_BYTES	(FLASH_INFO_PAGE - 2) // Location of the flash signature
 #define FLASH_SCRATCH		0x00	// Define the start of the scratch page
 
@@ -79,6 +78,6 @@
 #define FLASH_CALIBRATION_AREA_HIGH  (FLASH_CALIBRATION_CRC_HIGH - FLASH_CALIBRATION_AREA_SIZE)
 #define FLASH_CALIBRATION_CRC  (FLASH_SIGNATURE_BYTES - 1)
 #define FLASH_CALIBRATION_AREA  (FLASH_CALIBRATION_CRC - FLASH_CALIBRATION_AREA_SIZE)
-#endif
+#endif // BOARD_rfd900a
 
 #endif	// _FLASH_LAYOUT_H

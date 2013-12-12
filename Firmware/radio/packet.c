@@ -74,7 +74,7 @@ bool seen_mavlink;
 // is used to determine if we will inject RADIO status MAVLink
 // messages into the serial stream for ground station and aircraft
 // monitoring of link quality
-static void check_heartbeat(__xdata uint8_t * __pdata buf)
+static void check_heartbeat(__xdata uint8_t * __pdata buf) __nonbanked
 {
         if (buf[0] == MAVLINK10_STX &&
             buf[1] == 9 && buf[5] == 0) {
@@ -134,7 +134,7 @@ int16_t extract_hipri(uint8_t max_xmit)
 // return a complete MAVLink frame, possibly expanding
 // to include other complete frames that fit in the max_xmit limit
 static 
-uint8_t mavlink_frame(uint8_t max_xmit, __xdata uint8_t * __pdata buf)
+uint8_t mavlink_frame(uint8_t max_xmit, __xdata uint8_t * __pdata buf) __nonbanked
 {
 	__data uint16_t slen, offset = 0, high_offset;
 
@@ -198,6 +198,11 @@ uint8_t
 packet_get_next(register uint8_t max_xmit, __xdata uint8_t * __pdata buf)
 {
 	register uint16_t slen;
+	
+#ifdef WATCH_DOG_ENABLE
+	// Kick the Watchdog
+	PCA0CPH5 = 0;
+#endif // WATCH_DOG_ENABLE
 	
 	slen = serial_read_available();
 	if (force_resend ||
@@ -424,6 +429,44 @@ packet_is_duplicate(uint8_t len, __xdata uint8_t * __pdata buf, bool is_resend)
 #endif
 	last_recv_is_resend = true;
 	return false;
+}
+
+// inject a ati5 packet to send when possible
+void
+packet_ati5_inject(__pdata uint8_t ati5_id)
+{
+	if (ati5_id < PARAM_MAX) {
+		printf_start_capture(last_sent, sizeof(last_sent));
+		param_print(ati5_id);
+		last_sent_len = printf_end_capture();
+		
+		if(last_sent_len>0)
+		{
+			last_sent_is_resend = false;
+			injected_packet = true;
+		}
+	}
+	
+#ifdef WATCH_DOG_ENABLE
+	// Kick the Watchdog
+	PCA0CPH5 = 0;
+#endif // WATCH_DOG_ENABLE
+}
+
+// inject a at packet to send when possible
+void
+packet_at_inject(void)
+{
+	at_cmd_ready = true;
+	printf_start_capture(last_sent, sizeof(last_sent));
+	at_command();
+	last_sent_len = printf_end_capture();
+	
+	if (last_sent_len > 0)
+	{
+		last_sent_is_resend = false;
+		injected_packet = true;
+	}
 }
 
 // inject a packet to send when possible
