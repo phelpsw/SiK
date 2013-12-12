@@ -66,7 +66,13 @@ __code const struct parameter_info {
 	{"LBT_RSSI",		0},
 	{"MANCHESTER",		0},
 	{"RTSCTS",			0},
-	{"MAX_WINDOW",		131}
+	{"NODEID",			1}, // The base node is '1' lets make new nodes 2
+	{"NODEDESTINATION",	65535},
+	{"SYNCANY",			0}, // The amount of nodes in the network, this may could become auto discovery later.
+	{"NODECOUNT",		2}, // The amount of nodes in the network, this may could become auto discovery later.
+#ifdef INCLUDE_ENCRYPTION
+	{"ENCRYPTION",		0}, // no Enycryption (0), 128 or 256 bit key
+#endif
 };
 
 
@@ -83,6 +89,10 @@ __xdata param_t	parameter_values[PARAM_MAX];
 __xdata pins_user_info_t pin_values[PIN_MAX];
 #endif
 
+#ifdef INCLUDE_ENCRYPTION
+SEGMENT_VARIABLE (EncryptionKey[32], U8, SEG_XDATA); // Storage for 256bits
+#endif
+
 static bool
 param_check(__pdata enum ParamID id, __data uint32_t val)
 {
@@ -91,52 +101,71 @@ param_check(__pdata enum ParamID id, __data uint32_t val)
 		return false;
 
 	switch (id) {
-	case PARAM_FORMAT:
-		return false;
-
-	case PARAM_SERIAL_SPEED:
-		return serial_device_valid_speed(val);
-
-	case PARAM_AIR_SPEED:
-		if (val > 256)
+		case PARAM_FORMAT:
 			return false;
-		break;
-
-	case PARAM_NETID:
-		// all values are OK
-		return true;
-
-	case PARAM_TXPOWER:
-		if (val > BOARD_MAXTXPOWER)
-			return false;
-		break;
-
-	case PARAM_ECC:
-// If Golay not defined, we can't set this variable
+			
+		case PARAM_SERIAL_SPEED:
+			return serial_device_valid_speed(val);
+			
+		case PARAM_AIR_SPEED:
+			if (val > 256)
+				return false;
+			break;
+			
+		case PARAM_NETID:
+			// all values are OK
+			return true;
+			
+		case PARAM_TXPOWER:
+			if (val > BOARD_MAXTXPOWER)
+				return false;
+			break;
+			
+		case PARAM_ECC:
+			// If Golay not defined, we can't set this variable
 #ifndef INCLUDE_GOLAY
-		return false;
+			return false;
 #endif // INCLUDE_GOLAY
-	case PARAM_OPPRESEND:
-		// boolean 0/1 only
-		if (val > 1)
-			return false;
-		break;
-
-	case PARAM_MAVLINK:
-		if (val > 2)
-			return false;
-		break;
-
-	case PARAM_MAX_WINDOW:
-		// 131 milliseconds == 0x1FFF 16 usec ticks,
-		// which is the maximum we can handle with a 13
-		// bit trailer for window remaining
-		if (val > 131)
-			return false;
-		break;
-	default:
-		// no sanity check for this value
-		break;
+		case PARAM_OPPRESEND:
+		case PARAM_SYNCANY:
+			// boolean 0/1 only
+			if (val > 1)
+				return false;
+			break;
+			
+		case PARAM_MAVLINK:
+			if (val > 2)
+				return false;
+			break;
+			
+		// NodeDestination can be set to broadcast 65535 otherwise must be a node id.
+		case PARAM_NODEDESTINATION:
+			if(val == 0xFFFF)
+				return true;
+			else if(parameter_values[PARAM_NODEID] == val)
+				return false;
+			// NOTE THERE IS NO BREAK HERE, THIS IS INTENTIONAL
+			
+			// Can not assign above the node count
+		case PARAM_NODEID:
+			if(val >= parameter_values[PARAM_NODECOUNT])
+				return false;
+			break;
+			
+			// Can not assign id above 32,767 upper most bit is sync
+		case PARAM_NODECOUNT:
+			if(val < 2 && val > 0x8000)
+				return false;
+			break;
+			
+#ifdef INCLUDE_ENCRYPTION
+		case PARAM_ENCRYPTION:
+			if(val != 0 || val != 128 || val != 192 || val != 256)
+				return false;
+#endif
+		default:
+			// no sanity check for this value
+			break;
 	}
 	return true;
 }
@@ -150,48 +179,64 @@ param_set(__data enum ParamID param, __pdata param_t value)
 
 	// some parameters we update immediately
 	switch (param) {
-	case PARAM_TXPOWER:
-		// useful to update power level immediately when range
-		// testing in RSSI mode		
-		radio_set_transmit_power(value);
-		value = radio_get_transmit_power();
-		break;
-
-	case PARAM_DUTY_CYCLE:
-		// update duty cycle immediately
-		value = constrain(value, 0, 100);
-		duty_cycle = value;
-		break;
-
-	case PARAM_LBT_RSSI:
-		// update LBT RSSI immediately
-		if (value != 0) {
-			value = constrain(value, 25, 220);
-		}
-		lbt_rssi = value;
-		break;
-
-	case PARAM_MAVLINK:
-		feature_mavlink_framing = (uint8_t) value;
-		value = feature_mavlink_framing;
-		break;
-
-	case PARAM_OPPRESEND:
-		feature_opportunistic_resend = value?true:false;
-		value = feature_opportunistic_resend?1:0;
-		break;
-
-	case PARAM_RTSCTS:
-		feature_rtscts = value?true:false;
-		value = feature_rtscts?1:0;
-		break;
-
-	default:
-		break;
+		case PARAM_TXPOWER:
+			// useful to update power level immediately when range
+			// testing in RSSI mode
+			radio_set_transmit_power(value);
+			value = radio_get_transmit_power();
+			break;
+			
+		case PARAM_DUTY_CYCLE:
+			// update duty cycle immediately
+			value = constrain(value, 0, 100);
+			duty_cycle = value;
+			break;
+			
+		case PARAM_LBT_RSSI:
+			// update LBT RSSI immediately
+			if (value != 0) {
+				value = constrain(value, 25, 220);
+			}
+			lbt_rssi = value;
+			break;
+			
+		case PARAM_MAVLINK:
+			feature_mavlink_framing = (uint8_t) value;
+			value = feature_mavlink_framing;
+			break;
+			
+		case PARAM_OPPRESEND:
+			feature_opportunistic_resend = value?true:false;
+			value = feature_opportunistic_resend?1:0;
+			break;
+			
+		case PARAM_RTSCTS:
+			feature_rtscts = value?true:false;
+			value = feature_rtscts?1:0;
+			break;
+			
+		case PARAM_NODEID:
+			radio_set_node_id(value);
+			break;
+			
+		case PARAM_NODECOUNT:
+			tdm_set_node_count(value);
+			break;
+			
+		case PARAM_NODEDESTINATION:
+			tdm_set_node_destination(value);
+			break;
+			
+		case PARAM_SYNCANY:
+			tdm_set_sync_any(value);
+			break;
+			
+		default:
+			break;
 	}
-
+	
 	parameter_values[param] = value;
-
+	
 	return true;
 }
 
@@ -231,11 +276,33 @@ void write_params(__xdata uint8_t * __data input, uint8_t start, uint8_t size)
 	flash_write_scratch(i+1, checksum>>8);
 }
 
+//#ifdef INCLUDE_ENCRYPTION
+//__xdata uint8_t* param_encryptkey_get(void)
+//{
+//	return EncryptionKey;
+//}
+//
+//void param_encryptkey_set(__xdata uint8_t *key)
+//{
+//	__pdata uint8_t i;
+//	__pdata uint8_t val = parameter_values[PARAM_ENCRYPTION]/8;
+//
+//	for(i=0; i<val; i++) {
+//		encryption_key[i] = key[i];
+//	}
+//}
+//#endif
+
 bool
 param_load(void)
 __critical {
 	__pdata uint8_t		i;
 	__pdata uint16_t	expected;
+
+//#ifdef INCLUDE_ENCRYPTION
+//	__pdata uint16_t	sumexp;
+//	__pdata uint8_t		val;
+//#endif
 
 	// loop reading the parameters array
 	expected = flash_read_scratch(0);
@@ -264,36 +331,68 @@ __critical {
 		}
 	}
 
+//#ifdef INCLUDE_ENCRYPTION
+//		// write encryption key
+//		val = parameter_values[PARAM_ENCRYPTION]/8;
+//		
+//		for(i=val; i>0; i--) {
+//			// Store the key at the end of the flash page..
+//			EncryptionKey[i-1] = flash_read_scratch(1022-i);
+//		}
+//		
+//		sum = flash_read_scratch(1022)<<8 | flash_read_scratch(1023);
+//		sumexp = crc16(val, ((__xdata uint8_t *)EncryptionKey));
+//		// WTF Is this overflowing!!!!!!!
+//		//	if (sum != 0)//sumexp)
+//		//		return false;
+//#endif
+
 	return true;
 }
 
 void
 param_save(void)
 __critical {
+//#ifdef INCLUDE_ENCRYPTION
+//		__pdata uint8_t		val;
+//#endif
 
 	// tag parameters with the current format
 	parameter_values[PARAM_FORMAT] = PARAM_FORMAT_CURRENT;
-
+	
 	// erase the scratch space
 	flash_erase_scratch();
-
+	
 	// write param array length
 	flash_write_scratch(0, sizeof(parameter_values));
-
+	
 	// write params
 	write_params((__xdata uint8_t *)parameter_values, 1, sizeof(parameter_values));
 
-	// write pin params
 #if PIN_MAX > 0
 	write_params((__xdata uint8_t *)pin_values, sizeof(parameter_values)+3, sizeof(pin_values));
 #endif
+	
+//#ifdef INCLUDE_ENCRYPTION
+//		// write encryption key
+//		val = parameter_values[PARAM_ENCRYPTION]/8;
+//		
+//		for(i=val; i>0; i--) {
+//			// Store the key at the end of the flash page..
+//			flash_write_scratch(1022-i, EncryptionKey[i-1]);
+//		}
+//		
+//		sum = crc16(val, ((__xdata uint8_t *)EncryptionKey));
+//		flash_write_scratch(1022, sum>>8);
+//		flash_write_scratch(1023, sum&0xFF);
+//#endif
 }
 
 void
 param_default(void)
 {
 	__pdata uint8_t	i;
-
+	
 	// set all parameters to their default values
 	for (i = 0; i < PARAM_MAX; i++) {
 		parameter_values[i] = parameter_info[i].default_value;
@@ -313,12 +412,24 @@ enum ParamID
 param_id(__data char * __pdata name)
 {
 	__pdata uint8_t i;
-
+	
 	for (i = 0; i < PARAM_MAX; i++) {
 		if (!strcmp(name, parameter_info[i].name))
 			break;
 	}
 	return i;
+}
+
+void
+param_print(__data uint8_t	id)
+{
+	if (id < PARAM_MAX) {
+		printf("[%u] S%u: %s=%lu\n",
+			nodeId,
+			(unsigned)id,
+			parameter_info[id].name,
+			(unsigned long)parameter_values[id]);
+	}
 }
 
 const char *__code
@@ -382,13 +493,13 @@ calibration_get(uint8_t level) __reentrant
 {
 	uint8_t idx;
 	uint8_t crc = 0;
-
+	
 	// Change for next board revision
 	for (idx = 0; idx < FLASH_CALIBRATION_AREA_SIZE; idx++)
 	{
 		crc ^= calibration[idx];
 	}
-
+	
 	if (calibration_crc != 0xFF && calibration_crc == crc && level <= BOARD_MAXTXPOWER)
 	{
 		return calibration[level];
@@ -401,7 +512,7 @@ calibration_lock() __reentrant
 {
 	uint8_t idx;
 	uint8_t crc = 0;
-
+	
 	// check that all entries are written
 	if (flash_read_byte(FLASH_CALIBRATION_CRC_HIGH) == 0xFF)
 	{
@@ -415,7 +526,7 @@ calibration_lock() __reentrant
 				return false;
 			}
 		}
-
+		
 		// write crc
 		flash_write_byte(FLASH_CALIBRATION_CRC_HIGH, crc);
 		// lock the first and last pages

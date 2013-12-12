@@ -132,18 +132,18 @@ radio_receive_packet(uint8_t *length, __xdata uint8_t * __pdata buf) __nonbanked
 	// decode the header
 	errcount = golay_decode(6, buf, gout);
 	if (gout[0] != netid[0] ||
-	    gout[1] != netid[1]) {
+		gout[1] != netid[1]) {
 		// its not for our network ID 
 		debug("netid %x %x\n",
-		       (unsigned)gout[0],
-		       (unsigned)gout[1]);
+			(unsigned)gout[0],
+			(unsigned)gout[1]);
 		goto failed;
 	}
 
 	if (6*((gout[2]+2)/3+2) != elen) {
 		debug("rx len mismatch1 %u %u\n",
-		       (unsigned)gout[2],
-		       (unsigned)elen);		
+			(unsigned)gout[2],
+			(unsigned)elen);
 		goto failed;
 	}
 
@@ -161,11 +161,11 @@ radio_receive_packet(uint8_t *length, __xdata uint8_t * __pdata buf) __nonbanked
 
 	if (crc1 != crc2) {
 		debug("crc1=%x crc2=%x len=%u [%x %x]\n",
-		       (unsigned)crc1, 
-		       (unsigned)crc2, 
-		       (unsigned)*length,
-		       (unsigned)buf[0],
-		       (unsigned)buf[1]);
+			(unsigned)crc1,
+			(unsigned)crc2, 
+			(unsigned)*length,
+			(unsigned)buf[0],
+			(unsigned)buf[1]);
 		goto failed;
 	}
 
@@ -430,10 +430,10 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 
 	// transmit timeout ... clear the FIFO
 	debug("TX timeout %u ts=%u tn=%u len=%u\n",
-	       timeout_ticks,
-	       tstart,
-	       timer2_tick(),
-	       (unsigned)length);
+		timeout_ticks,
+		tstart,
+		timer2_tick(),
+		(unsigned)length);
 	if (errors.tx_errors != 0xFFFF) {
 		errors.tx_errors++;
 	}
@@ -801,9 +801,10 @@ radio_configure(__pdata uint8_t air_rate) __nonbanked
 		// when using golay encoding we use our own crc16
 		// instead of the hardware CRC, as we need to correct
 		// bit errors before checking the CRC
-		register_write(EZRADIOPRO_DATA_ACCESS_CONTROL,
-			       EZRADIOPRO_ENPACTX | 
-			       EZRADIOPRO_ENPACRX);
+		register_write(
+				EZRADIOPRO_DATA_ACCESS_CONTROL,
+				EZRADIOPRO_ENPACTX |
+				EZRADIOPRO_ENPACRX);
 		// 2 sync bytes and 2 header bytes
 		register_write(EZRADIOPRO_HEADER_CONTROL_2, EZRADIOPRO_HDLEN_2BYTE | EZRADIOPRO_SYNCLEN_2BYTE);
 
@@ -811,17 +812,19 @@ radio_configure(__pdata uint8_t air_rate) __nonbanked
 		register_write(EZRADIOPRO_HEADER_CONTROL_1, 0xCC);
 	} else {
 #endif // INCLUDE_GOLAY
-		register_write(EZRADIOPRO_DATA_ACCESS_CONTROL,
-			       EZRADIOPRO_ENPACTX | 
-			       EZRADIOPRO_ENPACRX |
-			       EZRADIOPRO_ENCRC |
-			       EZRADIOPRO_CRC_16);
+		register_write(
+				EZRADIOPRO_DATA_ACCESS_CONTROL,
+				EZRADIOPRO_ENPACTX |
+				EZRADIOPRO_ENPACRX |
+				EZRADIOPRO_ENCRC |
+				EZRADIOPRO_CRC_16);
 		// 2 sync bytes and 4 header bytes
 		register_write(EZRADIOPRO_HEADER_CONTROL_2, EZRADIOPRO_HDLEN_4BYTE | EZRADIOPRO_SYNCLEN_2BYTE);
 		// check 4 bytes of header and allow broadcast on 2 bytes
 		register_write(EZRADIOPRO_HEADER_CONTROL_1, 0xCF);
 		register_write(EZRADIOPRO_HEADER_ENABLE_1, 0xFF);
 		register_write(EZRADIOPRO_HEADER_ENABLE_0, 0xFF);
+#ifdef INCLUDE_GOLAY
 	}
 #endif // INCLUDE_GOLAY
 	// Headers 2/3 are always in use..
@@ -878,22 +881,22 @@ radio_configure(__pdata uint8_t air_rate) __nonbanked
 	if (g_board_frequency == FREQ_433) {
 		for (i = 0; i < NUM_RADIO_REGISTERS; i++) {
 			register_write(reg_index[i],
-				       reg_table_433[i][rate_selection]);
+				reg_table_433[i][rate_selection]);
 		}
 	} else if (g_board_frequency == FREQ_470) {
 		for (i = 0; i < NUM_RADIO_REGISTERS; i++) {
 			register_write(reg_index[i],
-				       reg_table_470[i][rate_selection]);
+				reg_table_470[i][rate_selection]);
 		}
 	} else if (g_board_frequency == FREQ_868) {
 		for (i = 0; i < NUM_RADIO_REGISTERS; i++) {
 			register_write(reg_index[i],
-				       reg_table_868[i][rate_selection]);
+				reg_table_868[i][rate_selection]);
 		}
 	} else {
 		for (i = 0; i < NUM_RADIO_REGISTERS; i++) {
 			register_write(reg_index[i],
-				       reg_table_915[i][rate_selection]);
+				reg_table_915[i][rate_selection]);
 		}
 	}
 
@@ -927,13 +930,13 @@ radio_set_transmit_power(uint8_t power) __nonbanked
 	i = calibration_get(power);
 	if (i != 0xFF)
 	{
-		PCA0CPH0 = i;     // Set PWM for PA to correct duty cycle
+		PCA0CPH0 = i;	// Set PWM for PA to correct duty cycle
 		settings.transmit_power = power;
 	}
 	else
 	{
 		i = power / POWER_LEVEL_STEP;
-		PCA0CPH0 = power_levels[i];     // Set PWM for PA to correct duty cycle
+		PCA0CPH0 = power_levels[i];	// Set PWM for PA to correct duty cycle
 		settings.transmit_power = i * POWER_LEVEL_STEP;
 	}
 #else
@@ -994,16 +997,15 @@ register_write(uint8_t reg, uint8_t value) __reentrant __nonbanked
 	EX0_SAVE_DISABLE;
 
 	RADIO_PAGE();
-	NSS1 = 0;                           // drive NSS low
-	SPIF1 = 0;                          // clear SPIF
-	SPI1DAT = (reg | 0x80);             // write reg address
-	while (!TXBMT1);                    // wait on TXBMT
-	SPI1DAT = value;                    // write value
-	while (!TXBMT1);                    // wait on TXBMT
-	while ((SPI1CFG & 0x80) == 0x80);   // wait on SPIBSY
-
-	SPIF1 = 0;                          // leave SPIF cleared
-	NSS1 = 1;                           // drive NSS high
+	NSS1 = 0;							// drive NSS low
+	SPIF1 = 0;							// clear SPIF
+	SPI1DAT = (reg | 0x80);				// write reg address
+	while (!TXBMT1);					// wait on TXBMT
+	SPI1DAT = value;					// write value
+	while (!TXBMT1);					// wait on TXBMT
+	while ((SPI1CFG & 0x80) == 0x80);	// wait on SPIBSY
+	SPIF1 = 0;							// leave SPIF cleared
+	NSS1 = 1;							// drive NSS high
 	SFRPAGE = LEGACY_PAGE;
 	
 	EX0_RESTORE;
@@ -1022,16 +1024,16 @@ register_read(uint8_t reg) __reentrant __nonbanked
 	EX0_SAVE_DISABLE;
 	
 	RADIO_PAGE();
-	NSS1 = 0;				// dsrive NSS low
-	SPIF1 = 0;				// clear SPIF
-	SPI1DAT = (reg);			// write reg address
-	while (!TXBMT1);			// wait on TXBMT
-	SPI1DAT = 0x00;				// write anything
-	while (!TXBMT1);			// wait on TXBMT
+	NSS1 = 0;							// dsrive NSS low
+	SPIF1 = 0;							// clear SPIF
+	SPI1DAT = (reg);					// write reg address
+	while (!TXBMT1);					// wait on TXBMT
+	SPI1DAT = 0x00;						// write anything
+	while (!TXBMT1);					// wait on TXBMT
 	while ((SPI1CFG & 0x80) == 0x80);	// wait on SPIBSY
-	value = SPI1DAT;			// read value
-	SPIF1 = 0;				// leave SPIF cleared
-	NSS1 = 1;				// drive NSS high
+	value = SPI1DAT;					// read value
+	SPIF1 = 0;							// leave SPIF cleared
+	NSS1 = 1;							// drive NSS high
 	SFRPAGE = LEGACY_PAGE;
 	
 	EX0_RESTORE;

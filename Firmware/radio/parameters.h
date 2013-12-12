@@ -106,7 +106,7 @@ extern param_t param_get(__data enum ParamID param);
 /// @return			The parameter ID, or PARAM_MAX if the
 ///				parameter is not known.
 ///
-//extern enum ParamID param_id(__data char * __pdata name);
+extern enum ParamID param_id(__data char * __pdata name);
 
 /// Return the name of a parameter.
 ///

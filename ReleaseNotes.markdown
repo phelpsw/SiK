@@ -1,5 +1,11 @@
 #Release Notes:
 
+##MP SiK 2.4:
+###Improvements
+* Altered timing for better throughput
+* Removed support for MAVLink 0.9 support freeing up code space
+* Updated Config to use a CRC instead of the XOR 
+
 ##MP SiK 2.3:
 
 ###Bug Fixes
@@ -23,8 +29,9 @@ ATPO=2        | Output   | Set Pin 2 to Output (Output's by Default can only be 
 ATPC=2,1      | Control  | Turn pin 2 on  - Output Mode / Set internal pull up resistor - Input Mode 
 ATPC=2,0      | Control  | Turn pin 2 off - Output Mode / Set internal pull down resistor - Input Mode
 
-The mapping between the pin numbers above and the port number are below
+Mapping between the pin numbers above and the port number are below
 
+######RFD900
 Pin  | Port
 ---- | ----
 0    | 2.3
@@ -33,6 +40,12 @@ Pin  | Port
 3    | 2.0
 4    | 2.6
 5    | 0.1
+
+######RFD900u
+Pin  | Port
+---- | ----
+0    | 1.0
+1    | 1.1
 
 ##MP SiK 2.2:
 ###Lookup Changes

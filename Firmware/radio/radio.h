@@ -102,7 +102,7 @@ extern bool feature_rtscts;
 /// @param	fmt		printf-style format string and argments
 ///				to be printed.
 ///
-extern void	panic(char *fmt, ...);
+extern void	panic(char *fmt, ...) __nonbanked;
 
 
 /// Alternate vprintf implementation

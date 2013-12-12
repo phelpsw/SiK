@@ -54,8 +54,6 @@
 
 __xdata uint8_t rx_buf[RX_BUFF_MAX] = {0};
 __xdata uint8_t tx_buf[TX_BUFF_MAX] = {0};
-__pdata const uint16_t  rx_mask = sizeof(rx_buf) - 1;
-__pdata const uint16_t  tx_mask = sizeof(tx_buf) - 1;
 
 // FIFO insert/remove pointers
 static volatile __pdata uint16_t				rx_insert, rx_remove;
@@ -67,12 +65,14 @@ static volatile __pdata uint16_t				tx_insert, tx_remove;
 static volatile bool			tx_idle;
 
 // FIFO status
-#define BUF_FULL(_which)	(((_which##_insert + 1) & _which##_mask) == (_which##_remove))
-#define BUF_NOT_FULL(_which)	(((_which##_insert + 1) & _which##_mask) != (_which##_remove))
-#define BUF_EMPTY(_which)	(_which##_insert == _which##_remove)
-#define BUF_NOT_EMPTY(_which)	(_which##_insert != _which##_remove)
-#define BUF_USED(_which)	((_which##_insert - _which##_remove) & _which##_mask)
-#define BUF_FREE(_which)	((_which##_remove - _which##_insert - 1) & _which##_mask)
+#define BUF_NEXT_INSERT(_b)	((_b##_insert + 1) == sizeof(_b##_buf)?0:(_b##_insert + 1))
+#define BUF_NEXT_REMOVE(_b)	((_b##_remove + 1) == sizeof(_b##_buf)?0:(_b##_remove + 1))
+#define BUF_FULL(_b)	(BUF_NEXT_INSERT(_b) == (_b##_remove))
+#define BUF_NOT_FULL(_b)	(BUF_NEXT_INSERT(_b) != (_b##_remove))
+#define BUF_EMPTY(_b)	(_b##_insert == _b##_remove)
+#define BUF_NOT_EMPTY(_b)	(_b##_insert != _b##_remove)
+#define BUF_USED(_b)	((_b##_insert >= _b##_remove)?(_b##_insert - _b##_remove):(sizeof(_b##_buf) - _b##_remove) + _b##_insert)
+#define BUF_FREE(_b)	((_b##_insert >= _b##_remove)?(sizeof(_b##_buf) + _b##_remove - _b##_insert):_b##_remove - _b##_insert)
 
 // FIFO insert/remove operations
 //
@@ -81,16 +81,17 @@ static volatile bool			tx_idle;
 // mode code.  This is violated if printing from interrupt context,
 // which should generally be avoided when possible.
 //
-#define BUF_INSERT(_which, _c)	do { _which##_buf[_which##_insert] = (_c); \
-		_which##_insert = ((_which##_insert+1) & _which##_mask); } while(0)
-#define BUF_REMOVE(_which, _c)	do { (_c) = _which##_buf[_which##_remove]; \
-		_which##_remove = ((_which##_remove+1) & _which##_mask); } while(0)
-#define BUF_PEEK(_which)	_which##_buf[_which##_remove]
-#define BUF_PEEK2(_which)	_which##_buf[(_which##_remove+1) & _which##_mask]
+#define BUF_INSERT(_b, _c)	do { _b##_buf[_b##_insert] = (_c); \
+		_b##_insert = BUF_NEXT_INSERT(_b); } while(0)
+#define BUF_REMOVE(_b, _c)	do { (_c) = _b##_buf[_b##_remove]; \
+		_b##_remove = BUF_NEXT_REMOVE(_b); } while(0)
+#define BUF_PEEK(_b)	_b##_buf[_b##_remove]
+#define BUF_PEEK2(_b)	_b##_buf[BUF_NEXT_REMOVE(_b)]
+#define BUF_PEEKX(_b, offset)	_b##_buf[(_b##_remove+offset) % sizeof(_b##_buf)]
 
-static void			_serial_write(register uint8_t c) __nonbanked;
-static void			serial_restart(void) __nonbanked;
-static void serial_device_set_speed(register uint8_t speed) __nonbanked;
+static void			_serial_write(register uint8_t c);
+static void			serial_restart(void);
+static void serial_device_set_speed(register uint8_t speed);
 
 // save and restore serial interrupt. We use this rather than
 // __critical to ensure we don't disturb the timer interrupt at all.
@@ -99,11 +100,13 @@ static void serial_device_set_speed(register uint8_t speed) __nonbanked;
 #define ES0_RESTORE ES0 = ES_saved
 
 // threshold for considering the rx buffer full
-#define SERIAL_CTS_THRESHOLD_LOW  RX_BUFF_MAX/32
-#define SERIAL_CTS_THRESHOLD_HIGH RX_BUFF_MAX/2
+#define SERIAL_CTS_THRESHOLD_LOW  17
+#define SERIAL_CTS_THRESHOLD_HIGH 34
+//#define SERIAL_CTS_THRESHOLD_LOW  RX_BUFF_MAX/32
+//#define SERIAL_CTS_THRESHOLD_HIGH RX_BUFF_MAX/2
 
 void
-serial_interrupt(void) __interrupt(INTERRUPT_UART0)
+Serial_ISR(void) __interrupt(INTERRUPT_UART0)
 {
 	register uint8_t	c;
 
@@ -132,7 +135,7 @@ serial_interrupt(void) __interrupt(INTERRUPT_UART0)
 				}
 			}
 #ifdef SERIAL_CTS
-			if (feature_rtscts && (BUF_FREE(rx) < SERIAL_CTS_THRESHOLD_LOW)) {
+			if (BUF_FREE(rx) < SERIAL_CTS_THRESHOLD_LOW) {
 				SERIAL_CTS = true;
 			}
 #endif
@@ -168,7 +171,7 @@ serial_interrupt(void) __interrupt(INTERRUPT_UART0)
 /// check if RTS allows us to send more data
 ///
 void
-serial_check_rts(void) __nonbanked
+serial_check_rts(void)
 {
 	if (BUF_NOT_EMPTY(tx) && tx_idle) {
 		serial_restart();
@@ -178,8 +181,6 @@ serial_check_rts(void) __nonbanked
 void
 serial_init(register uint8_t speed)
 {
-	SFRPAGE = LEGACY_PAGE;
-	
 	// disable UART interrupts
 	ES0 = 0;
 
@@ -210,7 +211,7 @@ serial_init(register uint8_t speed)
 }
 
 bool
-serial_write(register uint8_t c) __nonbanked
+serial_write(register uint8_t c)
 {
 	if (serial_write_space() < 1)
 		return false;
@@ -220,7 +221,7 @@ serial_write(register uint8_t c) __nonbanked
 }
 
 static void
-_serial_write(register uint8_t c) __reentrant __nonbanked
+_serial_write(register uint8_t c) __reentrant
 {
 	ES0_SAVE_DISABLE;
 
@@ -242,7 +243,7 @@ _serial_write(register uint8_t c) __reentrant __nonbanked
 
 // write as many bytes as will fit into the serial transmit buffer
 void
-serial_write_buf(__xdata uint8_t * __data buf, __pdata uint8_t count) __nonbanked
+serial_write_buf(__xdata uint8_t * __data buf, __pdata uint8_t count)
 {
 	__pdata uint16_t space;
 	__pdata uint8_t n1;
@@ -292,7 +293,7 @@ serial_write_buf(__xdata uint8_t * __data buf, __pdata uint8_t count) __nonbanke
 }
 
 uint16_t
-serial_write_space(void) __nonbanked
+serial_write_space(void)
 {
 	register uint16_t ret;
 	ES0_SAVE_DISABLE;
@@ -302,7 +303,7 @@ serial_write_space(void) __nonbanked
 }
 
 static void
-serial_restart(void) __nonbanked
+serial_restart(void)
 {
 #ifdef SERIAL_RTS
 	if (feature_rtscts && SERIAL_RTS && !at_mode_active) {
@@ -316,7 +317,7 @@ serial_restart(void) __nonbanked
 }
 
 uint8_t
-serial_read(void) __nonbanked
+serial_read(void)
 {
 	register uint8_t	c;
 
@@ -329,7 +330,7 @@ serial_read(void) __nonbanked
 	}
 
 #ifdef SERIAL_CTS
-	if (feature_rtscts && (BUF_FREE(rx) > SERIAL_CTS_THRESHOLD_HIGH)) {
+	if (BUF_FREE(rx) > SERIAL_CTS_THRESHOLD_HIGH) {
 		SERIAL_CTS = false;
 	}
 #endif
@@ -340,7 +341,7 @@ serial_read(void) __nonbanked
 }
 
 uint8_t
-serial_peek(void) __nonbanked
+serial_peek(void)
 {
 	register uint8_t c;
 
@@ -352,7 +353,7 @@ serial_peek(void) __nonbanked
 }
 
 uint8_t
-serial_peek2(void) __nonbanked
+serial_peek2(void)
 {
 	register uint8_t c;
 
@@ -363,11 +364,23 @@ serial_peek2(void) __nonbanked
 	return c;
 }
 
+uint8_t
+serial_peekx(uint16_t offset)
+{
+	register uint8_t c;
+
+	ES0_SAVE_DISABLE;
+	c = BUF_PEEKX(rx, offset);
+	ES0_RESTORE;
+
+	return c;
+}
+
 // read count bytes from the serial buffer. This implementation
 // tries to be as efficient as possible, while disabling interrupts
 // for as short a time as possible
 bool
-serial_read_buf(__xdata uint8_t * __data buf, __pdata uint8_t count) __nonbanked
+serial_read_buf(__xdata uint8_t * __data buf, __pdata uint8_t count)
 {
 	__pdata uint16_t n1;
 	// the caller should have already checked this, 
@@ -400,7 +413,7 @@ serial_read_buf(__xdata uint8_t * __data buf, __pdata uint8_t count) __nonbanked
 
 #ifdef SERIAL_CTS
 	__critical {
-		if (feature_rtscts && (BUF_FREE(rx) > SERIAL_CTS_THRESHOLD_HIGH)) {
+		if (BUF_FREE(rx) > SERIAL_CTS_THRESHOLD_HIGH) {
 			SERIAL_CTS = false;
 		}
 	}
@@ -409,7 +422,7 @@ serial_read_buf(__xdata uint8_t * __data buf, __pdata uint8_t count) __nonbanked
 }
 
 uint16_t
-serial_read_available(void) __nonbanked
+serial_read_available(void)
 {
 	register uint16_t ret;
 	ES0_SAVE_DISABLE;
@@ -420,7 +433,7 @@ serial_read_available(void) __nonbanked
 
 // return available space in rx buffer as a percentage
 uint8_t
-serial_read_space(void) __nonbanked
+serial_read_space(void)
 {
 	uint16_t space = sizeof(rx_buf) - serial_read_available();
 	space = (100 * (space/8)) / (sizeof(rx_buf)/8);
@@ -428,12 +441,13 @@ serial_read_space(void) __nonbanked
 }
 
 void
-putchar(char c) __reentrant __nonbanked
+putchar(char c) __reentrant
 {
 	if (c == '\n')
 		_serial_write('\r');
 	_serial_write(c);
 }
+
 
 ///
 /// Table of supported serial speed settings.
@@ -461,7 +475,7 @@ static const __code struct {
 // check if a serial speed is valid
 //
 bool 
-serial_device_valid_speed(register uint8_t speed) __nonbanked
+serial_device_valid_speed(register uint8_t speed)
 {
 	uint8_t i;
 	uint8_t num_rates = ARRAY_LENGTH(serial_rates);
@@ -475,7 +489,7 @@ serial_device_valid_speed(register uint8_t speed) __nonbanked
 }
 
 static 
-void serial_device_set_speed(register uint8_t speed) __nonbanked
+void serial_device_set_speed(register uint8_t speed)
 {
 	uint8_t i;
 	uint8_t num_rates = ARRAY_LENGTH(serial_rates);
