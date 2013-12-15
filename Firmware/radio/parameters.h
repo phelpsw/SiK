@@ -32,6 +32,8 @@
 /// Definitions for program parameter storage.
 ///
 
+#include "pins_user.h"
+
 /// Parameter IDs.
 ///
 /// Parameter IDs here match AT S-register numbers, so change them with extreme
@@ -71,7 +73,7 @@ enum ParamID {
         PARAM_MAX             // must be last
 };
 
-#define PARAM_FORMAT_CURRENT	0x1BUL				///< current parameter format ID
+#define PARAM_FORMAT_CURRENT	0x1BUL	//< current parameter format ID
 
 /// Parameter type.
 ///
@@ -79,7 +81,7 @@ enum ParamID {
 ///
 typedef uint32_t	param_t;
 #if PIN_MAX > 0
-extern pins_user_info_t pin_values[];
+extern  struct pins_user_info pin_values[];
 #endif
 
 /// Set a parameter

@@ -70,9 +70,6 @@ __code const struct parameter_info {
 	{"NODEDESTINATION",	65535},
 	{"SYNCANY",			0}, // The amount of nodes in the network, this may could become auto discovery later.
 	{"NODECOUNT",		2}, // The amount of nodes in the network, this may could become auto discovery later.
-#ifdef INCLUDE_ENCRYPTION
-	{"ENCRYPTION",		0}, // no Enycryption (0), 128 or 256 bit key
-#endif
 };
 
 
@@ -158,11 +155,6 @@ param_check(__pdata enum ParamID id, __data uint32_t val)
 				return false;
 			break;
 			
-#ifdef INCLUDE_ENCRYPTION
-		case PARAM_ENCRYPTION:
-			if(val != 0 || val != 128 || val != 192 || val != 256)
-				return false;
-#endif
 		default:
 			// no sanity check for this value
 			break;
@@ -276,33 +268,11 @@ void write_params(__xdata uint8_t * __data input, uint8_t start, uint8_t size)
 	flash_write_scratch(i+1, checksum>>8);
 }
 
-//#ifdef INCLUDE_ENCRYPTION
-//__xdata uint8_t* param_encryptkey_get(void)
-//{
-//	return EncryptionKey;
-//}
-//
-//void param_encryptkey_set(__xdata uint8_t *key)
-//{
-//	__pdata uint8_t i;
-//	__pdata uint8_t val = parameter_values[PARAM_ENCRYPTION]/8;
-//
-//	for(i=0; i<val; i++) {
-//		encryption_key[i] = key[i];
-//	}
-//}
-//#endif
-
 bool
 param_load(void)
 __critical {
 	__pdata uint8_t		i;
 	__pdata uint16_t	expected;
-
-//#ifdef INCLUDE_ENCRYPTION
-//	__pdata uint16_t	sumexp;
-//	__pdata uint8_t		val;
-//#endif
 
 	// loop reading the parameters array
 	expected = flash_read_scratch(0);
@@ -331,31 +301,12 @@ __critical {
 		}
 	}
 
-//#ifdef INCLUDE_ENCRYPTION
-//		// write encryption key
-//		val = parameter_values[PARAM_ENCRYPTION]/8;
-//		
-//		for(i=val; i>0; i--) {
-//			// Store the key at the end of the flash page..
-//			EncryptionKey[i-1] = flash_read_scratch(1022-i);
-//		}
-//		
-//		sum = flash_read_scratch(1022)<<8 | flash_read_scratch(1023);
-//		sumexp = crc16(val, ((__xdata uint8_t *)EncryptionKey));
-//		// WTF Is this overflowing!!!!!!!
-//		//	if (sum != 0)//sumexp)
-//		//		return false;
-//#endif
-
 	return true;
 }
 
 void
 param_save(void)
 __critical {
-//#ifdef INCLUDE_ENCRYPTION
-//		__pdata uint8_t		val;
-//#endif
 
 	// tag parameters with the current format
 	parameter_values[PARAM_FORMAT] = PARAM_FORMAT_CURRENT;
@@ -372,20 +323,6 @@ __critical {
 #if PIN_MAX > 0
 	write_params((__xdata uint8_t *)pin_values, sizeof(parameter_values)+3, sizeof(pin_values));
 #endif
-	
-//#ifdef INCLUDE_ENCRYPTION
-//		// write encryption key
-//		val = parameter_values[PARAM_ENCRYPTION]/8;
-//		
-//		for(i=val; i>0; i--) {
-//			// Store the key at the end of the flash page..
-//			flash_write_scratch(1022-i, EncryptionKey[i-1]);
-//		}
-//		
-//		sum = crc16(val, ((__xdata uint8_t *)EncryptionKey));
-//		flash_write_scratch(1022, sum>>8);
-//		flash_write_scratch(1023, sum&0xFF);
-//#endif
 }
 
 void

@@ -100,10 +100,10 @@ static void serial_device_set_speed(register uint8_t speed);
 #define ES0_RESTORE ES0 = ES_saved
 
 // threshold for considering the rx buffer full
-#define SERIAL_CTS_THRESHOLD_LOW  17
-#define SERIAL_CTS_THRESHOLD_HIGH 34
-//#define SERIAL_CTS_THRESHOLD_LOW  RX_BUFF_MAX/32
-//#define SERIAL_CTS_THRESHOLD_HIGH RX_BUFF_MAX/2
+//#define SERIAL_CTS_THRESHOLD_LOW  17
+//#define SERIAL_CTS_THRESHOLD_HIGH 34
+#define SERIAL_CTS_THRESHOLD_LOW  RX_BUFF_MAX/32
+#define SERIAL_CTS_THRESHOLD_HIGH RX_BUFF_MAX/2
 
 void
 Serial_ISR(void) __interrupt(INTERRUPT_UART0)
@@ -135,7 +135,7 @@ Serial_ISR(void) __interrupt(INTERRUPT_UART0)
 				}
 			}
 #ifdef SERIAL_CTS
-			if (BUF_FREE(rx) < SERIAL_CTS_THRESHOLD_LOW) {
+			if (feature_rtscts && (BUF_FREE(rx) < SERIAL_CTS_THRESHOLD_LOW)) {
 				SERIAL_CTS = true;
 			}
 #endif
@@ -181,6 +181,8 @@ serial_check_rts(void)
 void
 serial_init(register uint8_t speed)
 {
+	SFRPAGE = LEGACY_PAGE;
+	
 	// disable UART interrupts
 	ES0 = 0;
 
@@ -330,7 +332,7 @@ serial_read(void)
 	}
 
 #ifdef SERIAL_CTS
-	if (BUF_FREE(rx) > SERIAL_CTS_THRESHOLD_HIGH) {
+	if (feature_rtscts && (BUF_FREE(rx) > SERIAL_CTS_THRESHOLD_HIGH)) {
 		SERIAL_CTS = false;
 	}
 #endif
@@ -413,7 +415,7 @@ serial_read_buf(__xdata uint8_t * __data buf, __pdata uint8_t count)
 
 #ifdef SERIAL_CTS
 	__critical {
-		if (BUF_FREE(rx) > SERIAL_CTS_THRESHOLD_HIGH) {
+		if (feature_rtscts && (BUF_FREE(rx) > SERIAL_CTS_THRESHOLD_HIGH)) {
 			SERIAL_CTS = false;
 		}
 	}
@@ -447,6 +449,15 @@ putchar(char c) __reentrant
 		_serial_write('\r');
 	_serial_write(c);
 }
+
+//void
+//putchar(char c) __reentrant __nonbanked
+//{
+//	while (!TI0)
+//		;
+//	TI0 = 0;
+//	SBUF0 = c;
+//}
 
 
 ///

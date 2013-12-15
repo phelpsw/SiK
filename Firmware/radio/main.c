@@ -75,17 +75,13 @@ __code const char g_version_string[] = stringify(APP_VERSION_HIGH) "." stringify
 __pdata enum BoardFrequency	g_board_frequency;	///< board info from the bootloader
 __pdata uint8_t				g_board_bl_version;	///< from the bootloader
 
-/// Main Config
-///
-void main_init(void);
-
 /// Configure the Si1000 for operation.
 ///
-void hardware_init(void);
+static void hardware_init(void) __nonbanked;
 
 /// Initialise the radio and bring it online.
 ///
-void radio_init(void);
+static void radio_init(void) __nonbanked;
 
 /// statistics for radio and serial errors
 __pdata struct error_counts errors;
@@ -98,7 +94,7 @@ uint8_t feature_mavlink_framing;
 bool feature_rtscts;
 
 void
-main(void)
+main(void) __nonbanked
 {
 #ifdef CPU_SI1030
 	PSBANK = 0x33;
@@ -110,8 +106,10 @@ main(void)
 	g_board_frequency = BOARD_FREQUENCY_REG;
 	g_board_bl_version = BOARD_BL_VERSION_REG;
 
-	// Load parameters from flash or defaults
+	// try to load parameters; set them to defaults if that fails.
 	// this is done before hardware_init() to get the serial speed
+	// XXX default parameter selection should be based on board info
+	//
 	if (!param_load())
 		param_default();
 
@@ -147,6 +145,8 @@ main(void)
 	// Reset Watchdog
 	PCA0CPH5 = 0;
 #endif // WATCH_DOG_ENABLE
+	
+	tdm_serial_loop();
 }
 
 void
@@ -171,7 +171,7 @@ panic(char *fmt, ...) __nonbanked
 }
 
 static void
-hardware_init(void)
+hardware_init(void) __nonbanked
 {
 	__pdata uint16_t	i;
 	
@@ -182,12 +182,12 @@ hardware_init(void)
 	
 	// Select the internal oscillator, prescale by 1
 #ifdef CPU_SI1030
-	OSCICN	|=  0x80;
+	OSCICN	|=	0x80;
 #else
 	OSCICN	 =  0x8F;
 #endif
-	FLSCL	 =  0x40;
 	CLKSEL	 =  0x00;
+	FLSCL	 =  0x40;
 
 	// Configure the VDD brown out detector
 	VDM0CN	 =  0x80;
@@ -292,7 +292,7 @@ hardware_init(void)
 }
 
 static void
-radio_init(void)
+radio_init(void) __nonbanked
 {
 	__pdata uint32_t freq_min, freq_max;
 	__pdata uint32_t channel_spacing;
@@ -304,31 +304,31 @@ radio_init(void)
 	}
 	
 	switch (g_board_frequency) {
-		case FREQ_433:
+	case FREQ_433:
 		freq_min = 433050000UL;
 		freq_max = 434790000UL;
 		txpower = 10;
 		num_fh_channels = 10;
 		break;
-		case FREQ_470:
+	case FREQ_470:
 		freq_min = 470000000UL;
 		freq_max = 471000000UL;
 		txpower = 10;
 		num_fh_channels = 10;
 		break;
-		case FREQ_868:
+	case FREQ_868:
 		freq_min = 868000000UL;
 		freq_max = 869000000UL;
 		txpower = 10;
 		num_fh_channels = 10;
 		break;
-		case FREQ_915:
+	case FREQ_915:
 		freq_min = 915000000UL;
 		freq_max = 928000000UL;
 		txpower = 27;
-		num_fh_channels = 20; //MAX_FREQ_CHANNELS;
+			num_fh_channels = 20; //MAX_FREQ_CHANNELS;
 		break;
-		default:
+	default:
 		freq_min = 0;
 		freq_max = 0;
 		txpower = 0;
@@ -355,23 +355,23 @@ radio_init(void)
 	
 	// double check ranges the board can do
 	switch (g_board_frequency) {
-		case FREQ_433:
+	case FREQ_433:
 		freq_min = constrain(freq_min, 414000000UL, 460000000UL);
 		freq_max = constrain(freq_max, 414000000UL, 460000000UL);
 		break;
-		case FREQ_470:
+	case FREQ_470:
 		freq_min = constrain(freq_min, 450000000UL, 490000000UL);
 		freq_max = constrain(freq_max, 450000000UL, 490000000UL);
 		break;
-		case FREQ_868:
+	case FREQ_868:
 		freq_min = constrain(freq_min, 849000000UL, 889000000UL);
 		freq_max = constrain(freq_max, 849000000UL, 889000000UL);
 		break;
-		case FREQ_915:
+	case FREQ_915:
 		freq_min = constrain(freq_min, 868000000UL, 935000000UL);
 		freq_max = constrain(freq_max, 868000000UL, 935000000UL);
 		break;
-		default:
+	default:
 		panic("bad board frequency %d", g_board_frequency);
 		break;
 	}
@@ -411,10 +411,10 @@ radio_init(void)
 	if (num_fh_channels > 5) {
 		freq_min += ((unsigned long)(rand()*625)) % channel_spacing;
 	}
-	debug("freq low=%lu high=%lu spacing=%lu\n",
-		  freq_min, freq_min+(num_fh_channels*channel_spacing),
-		  channel_spacing);
-	
+	debug("freq low=%lu high=%lu spacing=%lu\n", 
+	       freq_min, freq_min+(num_fh_channels*channel_spacing), 
+	       channel_spacing);
+
 	// set the frequency and channel spacing
 	// change base freq based on netid
 	radio_set_frequency(freq_min);

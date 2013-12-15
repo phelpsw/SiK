@@ -83,6 +83,7 @@ radio_receive_packet(uint8_t *length, __xdata uint8_t * __pdata buf) __nonbanked
 	__data uint8_t elen;
 #endif // INCLUDE_GOLAY
 	__data uint8_t errcount = 0;
+//	__data uint16_t destination;
 
 	if (!packet_received) {
 		return false;
@@ -100,6 +101,10 @@ radio_receive_packet(uint8_t *length, __xdata uint8_t * __pdata buf) __nonbanked
 		goto failed;		
 	}
 #endif
+
+//	destination  = register_read(EZRADIOPRO_RECEIVED_HEADER_3) << 8;
+//	destination |= register_read(EZRADIOPRO_RECEIVED_HEADER_2);
+//	printf("DP-%u:%u\n\n", destination, nodeId);
 
 // If GOLAY not included always run this code..
 #ifdef INCLUDE_GOLAY
