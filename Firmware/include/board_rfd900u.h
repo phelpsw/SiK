@@ -110,9 +110,9 @@ SBIT(PIN_ENABLE,   SFR_P0, 3);
 		TMOD	 = (TMOD & ~0xf0) | 0x20;		/* TMOD: timer 1 in 8-bit autoreload */ \
 		TR1		 = 1;			/* START Timer1 */ \
 		TI0		 = 1;			/* Indicate TX0 ready */ \
-		/* INT0 is the radio interrupt, on P0.7 */	\
-		IT01CF	 = (IT01CF & 0xf) | 0x1;\
-		\
+		/* INT0 is the radio interrupt, on P0.1 */    \
+		IT01CF	 = (IT01CF & 0xf) | 0x01;\
+		IT0		 = 0;			/* INT0 level triggered */ \
 		P2		 = 0xFF;		/* P2 bug fix for SDCC and Raisonance*/ \
 	} while(0)
 

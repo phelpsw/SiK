@@ -262,6 +262,7 @@ hardware_init(void) __nonbanked
 	P3MDOUT |= 0xC0;		/* Leds */
 	P3DRV   |= 0xC0;		/* Leds */
 	SFRPAGE  = LEGACY_PAGE;
+	IT01CF	 = (IT01CF & 0xf) | 0x01;
 #endif
 	
 	// Turn on the 'radio running' LED and turn off the bootloader LED
