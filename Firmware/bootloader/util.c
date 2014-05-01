@@ -54,8 +54,21 @@ cout(uint8_t c)
 uint8_t
 cin(void)
 {
+	uint32_t timeout_cntr = 0;
 	while (!RI0)
-		;
+	{
+		// Timeout to reset the device into the program if nothing is sent..
+		// Meh timing.. Should calculate times later.
+		if(timeout_cntr >= 0xfffffffe)
+		{
+				// Reset the device using sofware reset
+				RSTSRC |= 0x10;
+		}
+		else
+		{
+				timeout_cntr++;
+		}
+	}
 	RI0 = 0;
 	return SBUF0;
 }
