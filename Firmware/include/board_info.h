@@ -49,12 +49,14 @@ enum BoardFrequency {
         FREQ_NONE	= 0xf0,
 };
 
+#define REGION_LOCK_CODE 0xA0
+
 // SFRs used to temporarily save board information during handoff
 // between the bootloader and the application.
 //
-#define BOARD_FREQUENCY_REG	ADC0GTH		// board frequency
-#define BOARD_BL_VERSION_REG	ADC0GTL		// bootloader version
-#define BOARD_UNUSED1_REG	ADC0LTH		// spare
-#define BOARD_UNUSED2_REG	ADC0LTL		// spare
+#define BOARD_FREQUENCY_REG     ADC0GTH		// board frequency
+#define BOARD_BL_VERSION_REG    ADC0GTL		// bootloader version
+#define BOARD_REGION_LOCK_REG   ADC0LTH		// Region lockout for FCC compliance
+#define BOARD_UNUSED2_REG       ADC0LTL		// spare
 
 #endif // _BOARD_INFO_H
