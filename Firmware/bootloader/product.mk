@@ -31,7 +31,18 @@
 VERSION		 =	3
 PRODUCT		 =	bootloader~$(BOARD)
 PRODUCT_DIR	:=	$(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
-PRODUCT_INSTALL	 =	$(foreach frequency,$(FREQUENCIES), $(OBJROOT)/$(PRODUCT)~$(frequency).hex)
+
+#
+# Get board-specific definitions early
+#
+include $(SRCROOT)/include/rules_$(BOARD).mk
+
+ifeq ($(CPU_CC1030), 1)
+REG_NAMES = {$(REGION_NAMES)}
+PRODUCT_INSTALL  =  $(foreach region,$(REGION_SUPPORT), $(foreach frequency,$(FREQUENCIES), $(OBJROOT)/$(PRODUCT)~$(frequency)~$(region)~$(word $(shell echo $(region)+1 | bc), $(REGION_NAMES)).hex))
+else
+PRODUCT_INSTALL  =  $(foreach frequency,$(FREQUENCIES), $(OBJROOT)/$(PRODUCT)~$(frequency).hex)
+endif
 
 CFLAGS		+=	-DBL_VERSION=$(VERSION)
 CFLAGS		+=	--model-small --no-xinit-opt --opt-code-size --Werror
@@ -58,11 +69,12 @@ endif
 # located at 0xfbfe, and its specific encoding.
 #
 $(PRODUCT_INSTALL):	frequency = $(basename $(word 3, $(subst ~, ,$(notdir $@))))
+$(PRODUCT_INSTALL):	region    = $(basename $(word 4, $(subst ~, ,$(notdir $@))))
 $(PRODUCT_INSTALL):	$(PRODUCT_HEX)
 	@echo PATCH $@
 	$(v)mkdir -p $(dir $@)
 ifeq ($(CPU_CC1030), 1)
-	$(v)$(SRCROOT)/tools/hexpatch.py --patch 0xfffe:0x`expr $(frequency) / 10` $(PRODUCT_HEX) > $@
+	$(v)$(SRCROOT)/tools/hexpatch.py --patch 0xfffe:0x`expr $(frequency) / 10`,0xfffd:0x$(region) $(PRODUCT_HEX) > $@
 else
 	$(v)$(SRCROOT)/tools/hexpatch.py --patch 0xfbfe:0x`expr $(frequency) / 10` $(PRODUCT_HEX) > $@
 endif
