@@ -122,11 +122,12 @@ extern uint8_t printf_end_capture(void);
 #define __stringify(_x)		#_x
 #define stringify(_x)		__stringify(_x)
 
-// Board infop
-extern __code const char 		g_version_string[];	///< printable version string
-extern __code const char 		g_banner_string[];	///< printable startup banner string
-extern __pdata enum BoardFrequency	g_board_frequency;	///< board RF frequency from the bootloader
-extern __pdata uint8_t			g_board_bl_version;	///< bootloader version
+// Board info
+extern __code const char            g_version_string[];    ///< printable version string
+extern __code const char            g_banner_string[];     ///< printable startup banner string
+extern __pdata enum BoardFrequency  g_board_frequency;     ///< board RF frequency from the bootloader
+extern __pdata uint8_t              g_board_bl_version;    ///< bootloader version
+extern __pdata enum BoardRegionLock g_board_region_lock;   ///< board region lock from the bootloader
 
 /// staticstics maintained by the radio code
 struct statistics {

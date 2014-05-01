@@ -71,7 +71,7 @@ __at(FLASH_FREQUENCY_BYTE) __code uint8_t board_frequency = FREQ_NONE;
 /// Patchbay for the board FCC Lock byte.
 /// This is patched in the hex file(s) after building.
 ///
-__at(FLASH_REGION_LOCK_BYTE) __code uint8_t board_region_lock = REGION_NONE;
+__at(FLASH_REGION_LOCK_BYTE) __code uint8_t board_region_lock = 0xFF;
 
 char
 flash_app_valid(void)

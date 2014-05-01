@@ -45,6 +45,7 @@
 #include "crc.h"
 #include <flash_layout.h>
 #include "pins_user.h"
+#include "fcc_params.h"
 
 /// In-ROM parameter info table.
 ///
@@ -56,13 +57,13 @@ __code const struct parameter_info {
 	{"SERIAL_SPEED",   57}, // match APM default of 57600
 	{"AIR_SPEED",      64}, // relies on MAVLink flow control
 	{"NETID",          25},
-	{"TXPOWER",        20},
+	{"TXPOWER",         0}, // Set in Main
 	{"ECC",             0},
 	{"MAVLINK",         1},
 	{"OPPRESEND",       0},
-	{"MIN_FREQ",        0},
-	{"MAX_FREQ",        0},
-	{"NUM_CHANNELS",    0},
+	{"MIN_FREQ",        0}, // Set in Main
+	{"MAX_FREQ",        0}, // Set in Main
+	{"NUM_CHANNELS",    0}, // Set in Main
 	{"DUTY_CYCLE",    100},
 	{"LBT_RSSI",        0},
 	{"MANCHESTER",      0},
@@ -77,7 +78,6 @@ __code const struct parameter_info {
 /// page anyway.
 ///
 __xdata param_t	parameter_values[PARAM_MAX];
-
 // Three extra bytes, 1 for the number of params and 2 for the checksum
 #define PARAM_FLASH_START		1
 #define PARAM_FLASH_END			(PARAM_FLASH_START + sizeof(parameter_values) + 2)
@@ -91,7 +91,9 @@ __xdata pins_user_info_t pin_values[PIN_MAX];
 #define PIN_FLASH_END		(PIN_FLASH_START + sizeof(pin_values) + 2)
 #endif
 
-
+#ifdef BOARD_rfd900u
+__xdata BoardRegionParams_t regionLock[REGION_MAX] = FCC_LOCK_PARAMS;
+#endif //BOARD_rfd900u
 
 static bool
 param_check(__pdata enum ParamID id, __data uint32_t val)
@@ -145,6 +147,31 @@ param_check(__pdata enum ParamID id, __data uint32_t val)
 		// no sanity check for this value
 		break;
 	}
+	
+	// Due to FCC requirements we need to lock down some of the settings
+	// If you don't care about FCC compliance you can remove this yourself
+#ifdef BOARD_rfd900u
+	if(g_board_region_lock < REGION_MAX)
+	{
+			switch (id) {
+				case PARAM_AIR_SPEED:
+					if(regionLock[g_board_region_lock].airSpeed != val){ return false; }
+					break;
+				case PARAM_MIN_FREQ:
+					if(regionLock[g_board_region_lock].minFreq != val){ return false; }
+					break;
+				case PARAM_MAX_FREQ:
+					if(regionLock[g_board_region_lock].maxFreq != val){ return false; }
+					break;
+				case PARAM_NUM_CHANNELS:
+					if(regionLock[g_board_region_lock].numChannels != val){ return false; }
+					break;
+				
+				default:
+					break;
+			}
+	}
+#endif //BOARD_rfd900u
 	return true;
 }
 

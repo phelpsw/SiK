@@ -1,6 +1,6 @@
 // -*- Mode: C; c-basic-offset: 8; -*-
 //
-// Copyright (c) 2011 Michael Smith, All Rights Reserved
+// Copyright (c) 2014 Luke Hovington, All Rights Reserved
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,45 +27,31 @@
 //
 
 ///
-/// @file	board_info.h
+/// @file	fcc_params.h
 ///
-/// Board information passed from the bootloader to the
-/// application.
+/// Variables for FCC approval
 ///
 
-#ifndef _BOARD_INFO_H_
-#define _BOARD_INFO_H_
+#ifndef _FCC_PARAMS_H_
+#define _FCC_PARAMS_H_
 
-/// Possible board RF configurations.
-///
-/// These bytes are patched into the last byte of the first
-/// page of flash.
-///
-enum BoardFrequency {
-        FREQ_433   = 0x43,
-        FREQ_470   = 0x47,
-        FREQ_868   = 0x86,
-        FREQ_915   = 0x91,
-        FREQ_NONE  = 0xf0,
-};
+#include <stdint.h>
+#include <stdbool.h>
 
-/// FCC approved configurations for RFDesign Modems.
-///
-/// These bytes are patched into flash.
-///
-enum BoardRegionLock {
-        REGION_AU    = 0x00,
-        REGION_NZ,
-        REGION_US,
-        REGION_MAX
-};
+#ifdef BOARD_rfd900u
 
-// SFRs used to temporarily save board information during handoff
-// between the bootloader and the application.
-//
-#define BOARD_FREQUENCY_REG     ADC0GTH		// board frequency
-#define BOARD_BL_VERSION_REG    ADC0GTL		// bootloader version
-#define BOARD_REGION_LOCK_REG   ADC0LTH		// Region lockout for FCC compliance
-#define BOARD_UNUSED2_REG       ADC0LTL		// spare
+typedef struct BoardRegionParams {
+	uint32_t   airSpeed;
+	uint32_t   minFreq;
+	uint32_t   maxFreq;
+	uint32_t   numChannels;
+} BoardRegionParams_t;
 
-#endif // _BOARD_INFO_H
+#define FCC_LOCK_PARAMS {\
+{64, 915000UL, 928000UL, 20}, /* REGION_AU */\
+{64, 915000UL, 928000UL, 20}, /* REGION_NZ */\
+{64, 915000UL, 928000UL, 20}, /* REGION_US */\
+}
+
+#endif //BOARD_rfd900u
+#endif
