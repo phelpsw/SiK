@@ -42,14 +42,23 @@
 /// page of flash.
 ///
 enum BoardFrequency {
-        FREQ_433	= 0x43,
-        FREQ_470	= 0x47,
-        FREQ_868	= 0x86,
-        FREQ_915	= 0x91,
-        FREQ_NONE	= 0xf0,
+        FREQ_433   = 0x43,
+        FREQ_470   = 0x47,
+        FREQ_868   = 0x86,
+        FREQ_915   = 0x91,
+        FREQ_NONE  = 0xf0,
 };
 
-#define REGION_LOCK_CODE 0xA0
+/// FCC approved configurations for RFDesign Modems.
+///
+/// These bytes are patched into flash.
+///
+enum BoardRegionLock {
+        REGION_AU    = 0x43,
+        REGION_NZ    = 0x47,
+        REGION_US    = 0x86,
+        REGION_NONE  = 0xA0,
+};
 
 // SFRs used to temporarily save board information during handoff
 // between the bootloader and the application.

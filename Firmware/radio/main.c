@@ -72,8 +72,9 @@ extern void    T3_ISR(void)            __interrupt(INTERRUPT_TIMER3);
 __code const char g_banner_string[] = "RFD SiK " stringify(APP_VERSION_HIGH) "." stringify(APP_VERSION_LOW) " on " BOARD_NAME;
 __code const char g_version_string[] = stringify(APP_VERSION_HIGH) "." stringify(APP_VERSION_LOW);
 
-__pdata enum BoardFrequency	g_board_frequency;	///< board info from the bootloader
-__pdata uint8_t			g_board_bl_version;	///< from the bootloader
+__pdata enum BoardFrequency  g_board_frequency;    ///< board info from the bootloader
+__pdata uint8_t              g_board_bl_version;   ///< from the bootloader
+__pdata enum BoardRegionLock g_board_region_lock;  ///< board region lock from the bootloader
 
 /// Configure the Si1000 for operation.
 ///
@@ -105,7 +106,8 @@ main(void)
 	//
 	g_board_frequency = BOARD_FREQUENCY_REG;
 	g_board_bl_version = BOARD_BL_VERSION_REG;
-
+	g_board_region_lock = BOARD_REGION_LOCK_REG;
+	
 	// Load parameters from flash or defaults
 	// this is done before hardware_init() to get the serial speed
 	if (!param_load())

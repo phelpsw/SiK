@@ -130,7 +130,7 @@ bl_main(void)
 			//
 			BOARD_FREQUENCY_REG = board_frequency;
 			BOARD_BL_VERSION_REG = BL_VERSION;
-			BOARD_REGION_LOCK_REG = REGION_LOCK_CODE;
+			BOARD_REGION_LOCK_REG = board_region_lock;
 
 #ifdef FLASH_BANKS
 			// Restore Banking Info

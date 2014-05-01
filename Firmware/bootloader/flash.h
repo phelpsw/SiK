@@ -44,6 +44,10 @@
 ///
 extern __at(FLASH_FREQUENCY_BYTE) __code uint8_t board_frequency;
 
+/// Board region lock, patched into the bootloader at build time.
+///
+extern __at(FLASH_REGION_LOCK_BYTE) __code uint8_t board_region_lock;
+
 /// Checks to see whether the flash contains a valid application.
 ///
 /// @returns	Nonzero if there is a valid application loaded.
