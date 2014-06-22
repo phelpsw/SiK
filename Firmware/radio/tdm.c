@@ -446,10 +446,10 @@ link_update(void)
 	}
 	
 	if (unlock_count < 6) {
-		LED_RADIO = LED_ON;
+		RADIO_LED(LED_ON);
 	} else {
 		sync_count = 0;
-		LED_RADIO = blink_state;
+		RADIO_LED(blink_state);
 		blink_state = !blink_state;
 		nodeTransmitSeq = 0xFFFF;
 		
@@ -680,9 +680,9 @@ tdm_serial_loop(void)
 					   !packet_is_duplicate(len, pbuf, trailer.resend) &&
 					   !at_mode_active) {
 					// its user data - send it out the serial port
-					LED_ACTIVITY = LED_ON;
+					ACTIVITY_LED(LED_ON);
 					serial_write_buf(pbuf, len);
-					LED_ACTIVITY = LED_OFF;
+					ACTIVITY_LED(LED_OFF);
 				}
 			}
 			continue;
@@ -926,7 +926,7 @@ tdm_serial_loop(void)
 		{
 			if (len != 0 && trailer.window != 0) {
 				// show the user that we're sending real data
-				LED_ACTIVITY = LED_ON;
+				ACTIVITY_LED(LED_ON);
 				nodeDestination = paramNodeDestination;
 			}
 			else { // Default to broadcast
@@ -1001,7 +1001,7 @@ tdm_serial_loop(void)
 		radio_receiver_on();
 
 		if (len != 0 && trailer.window != 0) {
-			LED_ACTIVITY = LED_OFF;
+			ACTIVITY_LED(LED_OFF);
 		}
 	}
 }
@@ -1241,7 +1241,9 @@ tdm_init(void)
 	// golay_test();
 
 	ati5_id = PARAM_MAX;
-	
+  unlock_count = 6;
+  RADIO_LED(LED_OFF);
+  
 #if USE_TICK_YIELD
 	received_packet = false;
 #ifdef DEBUG_PINS_YIELD

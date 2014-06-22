@@ -44,8 +44,11 @@
 //#define DEBUG_PINS_TRANSMIT_RECEIVE // P2.2
 //#define DEBUG_PINS_TX_RX_STATE // P2.3
 
-// Sync Logic on Pin // P2.6
+// Sync Logic on Pin // P2.2
 //#define TDM_SYNC_LOGIC
+
+// Activity logic on Pin // P2.1
+#define TDM_ACTIVITY_LOGIC
 
 // Hard coded for the inital testing, need to figure out how this could be changed on the fly later down the track
 // Maybe a new command seprate from the AT? Without entering +++ mode? more thought needed
@@ -53,8 +56,18 @@
 #define USE_TICK_YIELD 1
 
 #ifdef TDM_SYNC_LOGIC
-SBIT (TDM_SYNC_PIN, SFR_P2, 6);
+SBIT (TDM_SYNC_PIN, SFR_P2, 2);
 #endif // TDM_SYNC_LOGIC
+
+#ifdef TDM_ACTIVITY_LOGIC
+SBIT (TDM_ACTIVITY_PIN, SFR_P2, 1);
+SBIT (TDM_SYNC_PIN, SFR_P2, 2);
+#define ACTIVITY_LED(logic) TDM_ACTIVITY_PIN = logic; LED_ACTIVITY = logic;
+#define RADIO_LED(logic)    TDM_SYNC_PIN = logic;     LED_RADIO = logic;
+#else
+#define ACTIVITY_LED(logic) LED_ACTIVITY = logic
+#define RADIO_LED(logic) LED_RADIO = logic
+#endif
 
 /// initialise tdm subsystem
 extern void tdm_init(void);
