@@ -51,6 +51,11 @@
 ///
 __at(FLASH_SIGNATURE_BYTES) __code uint8_t flash_signature[2];
 
+/// Patchbay for the board frequency byte.
+/// This is patched in the hex file(s) after building.
+///
+__at(FLASH_FREQUENCY_BYTE) __code uint8_t board_frequency = FREQ_NONE;
+
 /// Lock byte
 ///
 /// We explicitly initialise the lock byte to prevent code in the high
@@ -59,14 +64,9 @@ __at(FLASH_SIGNATURE_BYTES) __code uint8_t flash_signature[2];
 /// combined this means that the bootloader code cannot be overwritten.
 /// RFD900A locks the bootloader as a separate step after calibration instead.
 ///
-#if !defined BOARD_rfd900a && !defined BOARD_rfd900u
-__at(FLASH_LOCK_BYTE) __code uint8_t flash_lock_byte = 0xfe;
+#if !defined BOARD_rfd900a && !defined BOARD_rfd900p
+volatile __at(FLASH_LOCK_BYTE) __code uint8_t flash_lock_byte = 0xfe;
 #endif
-
-/// Patchbay for the board frequency byte.
-/// This is patched in the hex file(s) after building.
-///
-__at(FLASH_FREQUENCY_BYTE) __code uint8_t board_frequency = FREQ_NONE;
 
 char
 flash_app_valid(void)
@@ -273,15 +273,14 @@ flash_read_byte(uint16_t address)
 #endif // FLASH_BANKS
 
 
-#ifdef BOARD_rfd900a
+#if defined BOARD_rfd900a || BOARD_rfd900p
 __at(FLASH_CALIBRATION_AREA_HIGH) uint8_t __code calibration[FLASH_CALIBRATION_AREA_SIZE];
-__at(FLASH_CALIBRATION_CRC_HIGH) uint8_t __code calibration_crc;
+__at(FLASH_CALIBRATION_CRC_HIGH)	uint8_t __code calibration_crc;
 
 void
 flash_transfer_calibration()
 {
 	uint8_t idx, crc = 0;
-	bool cal_empty = false;
 
 	// ensure the user area (plus crc byte) is all 0xFF
 	for (idx = 0; idx < FLASH_CALIBRATION_AREA_SIZE; idx++)
@@ -313,4 +312,4 @@ flash_transfer_calibration()
 	}
 	flash_write_byte(FLASH_CALIBRATION_CRC, calibration_crc);
 }
-#endif //BOARD_rfd900a
+#endif //BOARD_rfd900a/p
