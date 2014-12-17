@@ -329,12 +329,15 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 	preamble_detected = 0;
 	transmit_started = false;
 
-	// start TX
-	register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_1, EZRADIOPRO_TXON | EZRADIOPRO_XTON);
+#ifdef CPU_SI1030
+  LNA_SWITCH_PORT |= LNA_TRANSMIT_PIN;
+#endif // CPU_SI1030
 #ifdef DEBUG_PINS_RADIO_TX_RX
   P1 |=  0x01;
 #endif // DEBUG_PINS_RADIO_TX_RX
-  
+  // start TX
+  register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_1, EZRADIOPRO_TXON | EZRADIOPRO_XTON);
+
 	// wait for transmit complete or timeout
 	tstart = timer2_tick();
 	while ((uint16_t)(timer2_tick() - tstart) < timeout_ticks) {
@@ -382,6 +385,9 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 #ifdef DEBUG_PINS_RADIO_TX_RX
       P1 &= ~0x01;
 #endif // DEBUG_PINS_RADIO_TX_RX
+#ifdef CPU_SI1030
+      LNA_SWITCH_PORT &= ~LNA_TRANSMIT_PIN;
+#endif // CPU_SI1030
 			return false;
 		}
 
@@ -404,11 +410,17 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 #ifdef DEBUG_PINS_RADIO_TX_RX
         P1 &= ~0x01;
 #endif // DEBUG_PINS_RADIO_TX_RX
+#ifdef CPU_SI1030
+        LNA_SWITCH_PORT &= ~LNA_TRANSMIT_PIN;
+#endif // CPU_SI1030
 				return false;
 			}
 #ifdef DEBUG_PINS_RADIO_TX_RX
       P1 &= ~0x01;
 #endif // DEBUG_PINS_RADIO_TX_RX
+#ifdef CPU_SI1030
+      LNA_SWITCH_PORT &= ~LNA_TRANSMIT_PIN;
+#endif // CPU_SI1030
 			return true;
 		}
 

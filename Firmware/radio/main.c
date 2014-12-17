@@ -218,6 +218,12 @@ hardware_init(void)
 	
 	P3MDOUT |= 0xC0;		/* Leds */
 	P3DRV   |= 0xC0;		/* Leds */
+  
+  
+  P1MDOUT |= 0x01;		/* LNA Pin */
+  P1DRV   |= 0x01;		/* LNA Pin */
+  P5MDOUT |= 0x20;		/* LNA Pin */
+  P5DRV   |= 0x20;		/* LNA Pin */
 #else
 	P2DRV	|= 0xFF;
 #endif

@@ -57,6 +57,18 @@
 // Turn on TX/RX Debug pins
 //#define DEBUG_PINS_RADIO_TX_RX // TX P1.0 - RX P1.1
 
+#ifdef CPU_SI1030
+
+#ifdef BOARD_rfd900p
+#define LNA_SWITCH_PORT     P1 // .1
+#define LNA_TRANSMIT_PIN    0x01 // Pin high on transmit
+#else  // BOARD_rfd900p
+#define LNA_SWITCH_PORT     P5 // .5
+#define LNA_TRANSMIT_PIN    0x20 // Pin high on transmit
+#endif // BOARD_rfd900p
+
+#endif // CPU_SI1030
+
 #include "board.h"
 #include "serial.h"
 #include "board_info.h"
