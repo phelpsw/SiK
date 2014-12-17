@@ -147,7 +147,7 @@ void param_encryptkey_set(__xdata uint8_t *key);
 extern SEGMENT_VARIABLE (EncryptionKey[32], U8, SEG_XDATA);
 #endif
 
-#ifdef BOARD_rfd900a
+#if defined BOARD_rfd900a || defined BOARD_rfd900p
 extern bool calibration_set(uint8_t idx, uint8_t value) __reentrant;
 extern uint8_t calibration_get(uint8_t level) __reentrant;
 extern bool calibration_lock() __reentrant;

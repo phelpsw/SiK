@@ -388,7 +388,7 @@ uint32_t constrain(__pdata uint32_t v, __pdata uint32_t min, __pdata uint32_t ma
 
 // rfd900a calibration stuff
 // Change for next rfd900 revision
-#ifdef BOARD_rfd900a
+#if defined BOARD_rfd900a || defined BOARD_rfd900p
 static __at(FLASH_CALIBRATION_AREA) uint8_t __code calibration[FLASH_CALIBRATION_AREA_SIZE];
 static __at(FLASH_CALIBRATION_CRC) uint8_t __code calibration_crc;
 
@@ -412,6 +412,10 @@ flash_read_byte(uint16_t address) __reentrant
 bool
 calibration_set(uint8_t idx, uint8_t value) __reentrant
 {
+#ifdef CPU_SI1030
+  PSBANK = 0x33;
+#endif
+  
 	// if level is valid
 	if (idx <= BOARD_MAXTXPOWER && value != 0xFF)
 	{
@@ -430,8 +434,12 @@ calibration_get(uint8_t level) __reentrant
 {
 	uint8_t idx;
 	uint8_t crc = 0;
-	
-	// Change for next board revision
+
+#ifdef CPU_SI1030
+  PSBANK = 0x33;
+#endif
+  
+  // Change for next board revision
 	for (idx = 0; idx < FLASH_CALIBRATION_AREA_SIZE; idx++)
 	{
 		crc ^= calibration[idx];
@@ -449,7 +457,11 @@ calibration_lock() __reentrant
 {
 	uint8_t idx;
 	uint8_t crc = 0;
-	
+
+#ifdef CPU_SI1030
+  PSBANK = 0x33;
+#endif
+  
 	// check that all entries are written
 	if (flash_read_byte(FLASH_CALIBRATION_CRC_HIGH) == 0xFF)
 	{
@@ -473,4 +485,4 @@ calibration_lock() __reentrant
 	}
 	return false;
 }
-#endif
+#endif // BOARD_rfd900a/p
