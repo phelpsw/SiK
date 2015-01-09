@@ -1,4 +1,13 @@
-# SiK - Firmware for SiLabs Si1000 - Si102x/3x ISM radios
+SiK - Multipoint Branch
+=====
+Firmware for SiLabs Si1000 - Si102x/3x ISM radios
+
+SiK is a collection of firmware and tools for radios based on the cheap, versatile SiLabs Si1000 SoC.
+
+## Branch Build Status
+[![Build Status](http://jenkins.hovo.id.au/buildStatus/icon?job=SiK_Multipoint)](http://jenkins.hovo.id.au/job/SiK_Multipoint/)
+
+## Documentation
 
 For user documentation please see this site:
 
