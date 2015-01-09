@@ -55,7 +55,7 @@ endif
 # Patch the frequency code into the hex file.
 #
 # Note that we have secret knowledge here that the frequency code byte is 
-# located at 0xfbfe, and its specific encoding.
+# located at 0xfbfe or 0xfffe, and its specific encoding.
 #
 $(PRODUCT_INSTALL):	frequency = $(basename $(word 3, $(subst ~, ,$(notdir $@))))
 $(PRODUCT_INSTALL):	$(PRODUCT_HEX)
