@@ -197,8 +197,8 @@ hardware_init(void) __nonbanked
 #ifdef CPU_SI1030
 	P0SKIP  =  0xCF;
 	P1SKIP  =  0xFF;
-	P2SKIP  =  0xF0;
-#elif defined _BOARD_RFD900A			// Redefine port skips to override bootloader defs
+	P2SKIP  =  0x28;
+#elif defined BOARD_rfd900a       // Redefine port skips to override bootloader defs
 	P0SKIP  =  0xCF;                // P0 UART avail on XBAR
 	P1SKIP  =  0xF8;                // P1 SPI1 avail on XBAR
 	P2SKIP  =  0xCF;                // P2 CEX0 avail on XBAR P2.4, rest GPIO
@@ -211,26 +211,35 @@ hardware_init(void) __nonbanked
 	SFRPAGE	 =  LEGACY_PAGE;
 	XBR0	 =  0x01;		// UART enable
 	
-	// SPI1
-#ifdef _BOARD_RFD900A
-	XBR1	|= 0x44;	// enable SPI in 3-wire mode
-	P1MDOUT	|= 0xF5;	// SCK1, MOSI1, MISO1 push-pull
-	P2MDOUT	|= 0xFF;	// SCK1, MOSI1, MISO1 push-pull
-#elif defined CPU_SI1030
-	XBR1	|= 0x40;	// Enable SPI1 (3 wire mode)
-	P2MDOUT	|= 0x0D;	// SCK1, MOSI1, & NSS1,push-pull
+  // SPI1
+#if defined CPU_SI1030
+  XBR1    |= 0x41;	// Enable SPI1 (3 wire mode) + CEX0
+  P2MDOUT |= 0xFD;	// SCK1, MOSI1, & NSS1,push-pull
+#elif defined BOARD_rfd900a		// Redefine port skips to override bootloader defs
+  XBR1    |= 0x41;	// enable SPI in 3-wire mode + CEX0
+  P1MDOUT |= 0xF5;	// SCK1, MOSI1, MISO1 push-pull
+  P2MDOUT |= 0xFF;	// SCK1, MOSI1, MISO1 push-pull
 #else
-	XBR1	|= 0x40;	// enable SPI in 3-wire mode
-	P1MDOUT	|= 0xF5;	// SCK1, MOSI1, MISO1 push-pull
+  XBR1    |= 0x40;	// enable SPI in 3-wire mode
+  P1MDOUT |= 0xF5;	// SCK1, MOSI1, MISO1 push-pull
 #endif
 	
 	SFRPAGE	 = CONFIG_PAGE;
 	P1DRV	|= 0xF5;	// SPI signals use high-current mode, LEDs and PAEN High current drive
 	
 #ifdef CPU_SI1030
-	P2DRV	 = 0xFD; // MOSI1, SCK1, NSS1, high-drive mode
+  P2DRV	 = 0xFD; // MOSI1, SCK1, NSS1, high-drive mode
+  
+  P3MDOUT |= 0xC0;		/* Leds */
+  P3DRV   |= 0xC0;		/* Leds */
+  
+  
+  P1MDOUT |= 0x01;		/* LNA Pin */
+  P1DRV   |= 0x01;		/* LNA Pin */
+  P5MDOUT |= 0x20;		/* LNA Pin */
+  P5DRV   |= 0x20;		/* LNA Pin */
 #else
-	P2DRV	|= 0xFF;
+  P2DRV	|= 0xFF;
 #endif
 	
 	RADIO_PAGE();
@@ -257,13 +266,13 @@ hardware_init(void) __nonbanked
 	// global interrupt enable
 	EA = 1;
 	
-#ifdef _BOARD_RFD900U
-	SFRPAGE  = CONFIG_PAGE;
-	P3MDOUT |= 0xC0;		/* Leds */
-	P3DRV   |= 0xC0;		/* Leds */
-	SFRPAGE  = LEGACY_PAGE;
-	IT01CF	 = (IT01CF & 0xf) | 0x01;
-#endif
+//#ifdef _BOARD_RFD900U
+//	SFRPAGE  = CONFIG_PAGE;
+//	P3MDOUT |= 0xC0;		/* Leds */
+//	P3DRV   |= 0xC0;		/* Leds */
+//	SFRPAGE  = LEGACY_PAGE;
+//	IT01CF	 = (IT01CF & 0xf) | 0x01;
+//#endif
 	
 	// Turn on the 'radio running' LED and turn off the bootloader LED
 	LED_RADIO = LED_ON;
@@ -276,7 +285,7 @@ hardware_init(void) __nonbanked
 	ADC0MX = 0x1B;	// Set ADC0MX to temp sensor
 	REF0CN = 0x07;	// Define reference and enable temp sensor
 	
-#ifdef _BOARD_RFD900A
+#if defined BOARD_rfd900a || defined BOARD_rfd900p
 	// PCA0, CEX0 setup and enable.
 	//	PCA0H
 	PCA0CPL5 = 0xFF; // 32.1ms WDT time out @ 24.5Mz System Clock
@@ -327,7 +336,7 @@ radio_init(void) __nonbanked
 		freq_min = 915000000UL;
 		freq_max = 928000000UL;
 		txpower = 27;
-			num_fh_channels = 20; //MAX_FREQ_CHANNELS;
+			num_fh_channels = MAX_FREQ_CHANNELS;
 		break;
 	default:
 		freq_min = 0;
