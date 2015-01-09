@@ -330,7 +330,9 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 	transmit_started = false;
 
 #ifdef CPU_SI1030
+  SFRPAGE = LNA_PAGE;
   LNA_SWITCH_PORT |= LNA_TRANSMIT_PIN;
+  SFRPAGE = LEGACY_PAGE;
 #endif // CPU_SI1030
 #ifdef DEBUG_PINS_RADIO_TX_RX
   P1 |=  0x01;
@@ -386,7 +388,9 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
       P1 &= ~0x01;
 #endif // DEBUG_PINS_RADIO_TX_RX
 #ifdef CPU_SI1030
+      SFRPAGE = LNA_PAGE;
       LNA_SWITCH_PORT &= ~LNA_TRANSMIT_PIN;
+      SFRPAGE = LEGACY_PAGE;
 #endif // CPU_SI1030
 			return false;
 		}
@@ -411,7 +415,9 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
         P1 &= ~0x01;
 #endif // DEBUG_PINS_RADIO_TX_RX
 #ifdef CPU_SI1030
+        SFRPAGE = LNA_PAGE;
         LNA_SWITCH_PORT &= ~LNA_TRANSMIT_PIN;
+        SFRPAGE = LEGACY_PAGE;
 #endif // CPU_SI1030
 				return false;
 			}
@@ -419,7 +425,9 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
       P1 &= ~0x01;
 #endif // DEBUG_PINS_RADIO_TX_RX
 #ifdef CPU_SI1030
+      SFRPAGE = LNA_PAGE;
       LNA_SWITCH_PORT &= ~LNA_TRANSMIT_PIN;
+      SFRPAGE = LEGACY_PAGE;
 #endif // CPU_SI1030
 			return true;
 		}

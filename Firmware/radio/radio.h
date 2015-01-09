@@ -50,6 +50,15 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "board.h"
+#include "serial.h"
+#include "board_info.h"
+#include "pins_user.h"
+#include "parameters.h"
+#include "at.h"
+#include "flash.h"
+#include "rtc.h"
+
 // the biggest packet length we will allow. To allow for golay
 // encoding this needs to be a multiple of 6
 #define MAX_PACKET_LENGTH 252
@@ -61,22 +70,15 @@
 
 #ifdef BOARD_rfd900p
 #define LNA_SWITCH_PORT     P1 // .1
-#define LNA_TRANSMIT_PIN    0x01 // Pin high on transmit
+#define LNA_TRANSMIT_PIN    1<<1 // Pin high on transmit
+#define LNA_PAGE            LEGACY_PAGE
 #else  // BOARD_rfd900p
 #define LNA_SWITCH_PORT     P5 // .5
-#define LNA_TRANSMIT_PIN    0x20 // Pin high on transmit
+#define LNA_TRANSMIT_PIN    1<<5 // Pin high on transmit
+#define LNA_PAGE            CONFIG_PAGE
 #endif // BOARD_rfd900p
 
 #endif // CPU_SI1030
-
-#include "board.h"
-#include "serial.h"
-#include "board_info.h"
-#include "pins_user.h"
-#include "parameters.h"
-#include "at.h"
-#include "flash.h"
-#include "rtc.h"
 
 // canary data for ram wrap
 extern __pdata uint8_t pdata_canary;

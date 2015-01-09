@@ -218,12 +218,22 @@ hardware_init(void)
 	
 	P3MDOUT |= 0xC0;		/* Leds */
 	P3DRV   |= 0xC0;		/* Leds */
+
+  // Setup LNA Pins
+#ifndef LNA_SWITCH_PORT
+#error LNA PINS NOT DEFINED
+#endif // LNA_SWITCH_PORT
+#if LNA_SWITCH_PORT == P1
+  SFRPAGE	= LEGACY_PAGE;
+  P1MDOUT |= LNA_TRANSMIT_PIN;		/* LNA Pin */
+  SFRPAGE	= CONFIG_PAGE;
+  P1DRV   |= LNA_TRANSMIT_PIN;		/* LNA Pin */
+#elif LNA_SWITCH_PORT == P5
+  SFRPAGE	= CONFIG_PAGE;
+  P5MDOUT |= LNA_TRANSMIT_PIN;		/* LNA Pin */
+  P5DRV   |= LNA_TRANSMIT_PIN;		/* LNA Pin */
+#endif // LNA_SWITCH_PORT
   
-  
-  P1MDOUT |= 0x01;		/* LNA Pin */
-  P1DRV   |= 0x01;		/* LNA Pin */
-  P5MDOUT |= 0x20;		/* LNA Pin */
-  P5DRV   |= 0x20;		/* LNA Pin */
 #else
 	P2DRV	|= 0xFF;
 #endif
