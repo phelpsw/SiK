@@ -40,7 +40,6 @@
 #include "radio.h"
 #include "tdm.h"
 #include "timer.h"
-#include "freq_hopping.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @name	Interrupt vector prototypes
@@ -69,11 +68,14 @@ extern void    T3_ISR(void)            __interrupt(INTERRUPT_TIMER3);
 
 //@}
 
-__code const char g_banner_string[] = "RFD SiK " stringify(APP_VERSION_HIGH) "." stringify(APP_VERSION_LOW) " on " BOARD_NAME;
+__code const char g_banner_string[] = "RFD PINTX SiK " stringify(APP_VERSION_HIGH) "." stringify(APP_VERSION_LOW) " on " BOARD_NAME;
 __code const char g_version_string[] = stringify(APP_VERSION_HIGH) "." stringify(APP_VERSION_LOW);
 
 __pdata enum BoardFrequency	g_board_frequency;	///< board info from the bootloader
 __pdata uint8_t			g_board_bl_version;	///< from the bootloader
+
+#define MAX_FREQ_CHANNELS 50
+__pdata uint8_t num_fh_channels;
 
 /// Configure the Si1000 for operation.
 ///
@@ -88,10 +90,8 @@ __pdata struct error_counts errors;
 __pdata struct statistics statistics, remote_statistics;
 
 /// optional features
-bool feature_golay;
-bool feature_opportunistic_resend;
-uint8_t feature_mavlink_framing;
 bool feature_rtscts;
+bool transmit_only;
 
 void
 main(void)
@@ -112,10 +112,8 @@ main(void)
 		param_default();
 
 	// setup boolean features
-	feature_mavlink_framing = param_s_get(PARAM_MAVLINK);
-	feature_opportunistic_resend = param_s_get(PARAM_OPPRESEND)?true:false;
-	feature_golay = param_s_get(PARAM_ECC)?true:false;
 	feature_rtscts = param_s_get(PARAM_RTSCTS)?true:false;
+  transmit_only = param_s_get(PARAM_TRANSMIT)?true:false;
 
 	// Do hardware initialisation.
 	hardware_init();
@@ -315,9 +313,6 @@ radio_init(void)
 		break;
 	}
 
-	if (param_s_get(PARAM_NUM_CHANNELS) != 0) {
-		num_fh_channels = param_s_get(PARAM_NUM_CHANNELS);
-	}
 	if (param_s_get(PARAM_MIN_FREQ) != 0) {
 		freq_min        = param_s_get(PARAM_MIN_FREQ) * 1000UL;
 	}
@@ -386,7 +381,6 @@ radio_init(void)
 	// add another offset based on network ID. This means that
 	// with different network IDs we will have much lower
 	// interference
-	srand(param_s_get(PARAM_NETID));
 	if (num_fh_channels > 5) {
 		freq_min += ((unsigned long)(rand()*625)) % channel_spacing;
 	}
@@ -401,8 +395,8 @@ radio_init(void)
 	// set channel spacing
 	radio_set_channel_spacing(channel_spacing);
 
-	// start on a channel chosen by network ID
-	radio_set_channel(param_s_get(PARAM_NETID) % num_fh_channels);
+	// start on a channel chosen by user
+	radio_set_channel(param_s_get(PARAM_CHANNEL) % num_fh_channels);
 
 	// And intilise the radio with them.
 	if (!radio_configure(param_s_get(PARAM_AIR_SPEED)) &&
@@ -427,9 +421,6 @@ radio_init(void)
 	// initialise real time clock
 	rtc_init();
 #endif
-
-	// initialise frequency hopping system
-	fhop_init(param_s_get(PARAM_NETID));
 
 	// initialise TDM system
 	tdm_init();

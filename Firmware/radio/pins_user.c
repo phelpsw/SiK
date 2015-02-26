@@ -38,6 +38,11 @@
 
 #if PIN_MAX > 0
 
+// Pin location in the array
+#define AT_DISABLE_PIN 4
+#define AT_V_GND_PIN   5
+#define FOOTER_CHECK 0xA5BF
+
 // pin_values defined as extern in parameters
 __code const struct pins_user_map {
 	uint8_t port;
@@ -69,20 +74,42 @@ __code const struct pins_user_map {
 };
 #endif
 
+__pdata struct pinState_packet pinStatePacket;
+bool at_mode, sendUpdateNow;
+
 void
 pins_user_init(void)
 {
 	__pdata uint8_t i;
 	
+  pinStatePacket.no_pins = PIN_MAX;
+  pinStatePacket.footer = FOOTER_CHECK;
 	// Set the Default pin behaviour
-	for(i=0; i<PIN_MAX; i++)
-	{
-		pins_user_set_io(i, pin_values[i].output);
-		pins_user_set_value(i, pin_values[i].pin_dir);
-	}
-	
-// Client Application Hack
-//	pins_user_set_value(3,PIN_HIGH);
+  if(transmit_only)
+  {
+    for(i=0; i<PIN_MAX; i++)
+    {
+      pins_user_set_io(i, PIN_INPUT);
+      pins_user_set_value(i, PIN_HIGH);
+    }
+  }
+  else
+  {
+    for(i=0; i<PIN_MAX; i++)
+    {
+      pins_user_set_io(i, PIN_OUTPUT);
+      pins_user_set_value(i, PIN_LOW);
+    }
+  }
+  
+  if(AT_V_GND_PIN < PIN_MAX)
+  {
+    pins_user_set_io(AT_DISABLE_PIN, PIN_INPUT);
+    pins_user_set_value(AT_DISABLE_PIN, PIN_HIGH);
+    
+    pins_user_set_io(AT_V_GND_PIN, PIN_OUTPUT);
+    pins_user_set_value(AT_V_GND_PIN, PIN_LOW);
+  }
 }
 
 bool
@@ -166,7 +193,6 @@ bool
 pins_user_set_value(__pdata uint8_t pin, bool high_low)
 {
 	pin_values[pin].pin_dir = high_low;
-	
 	if(PIN_MAX > pin && pin_values[pin].pin_mirror == PIN_NULL)
 	{
 		switch(pins_user_map[pin].port)
@@ -253,28 +279,48 @@ pins_user_get_adc(__pdata uint8_t pin)
 	return PIN_ERROR;
 }
 
+#define PIN_AB_MAX (pinStatePacket.no_pins < PIN_MAX ? pinStatePacket.no_pins : PIN_MAX)
+
 void
 pins_user_check()
 {
-//	static uint8_t p, p_count;
-//	if (pins_user_get_adc(5) != p || p_count != 0) {
-//		if(pins_user_get_adc(5) != p)
-//		{
-//			p = pins_user_get_adc(5);
-//			p_count = 100;
-//		}
-//		at_cmd[0] = 'R';
-//		at_cmd[1] = 'T';
-//		at_cmd[2] = 'P';
-//		at_cmd[3] = 'C';
-//		at_cmd[4] = '=';
-//		at_cmd[5] = '4';
-//		at_cmd[6] = ',';
-//		at_cmd[7] = '0'+(p?1:0);
-//		at_cmd[8] = 0;
-//		tdm_remote_at();
-//		p_count --;
-//	}
+  __pdata uint8_t i;
+  static __pdata struct pinState_packet pinChange;
+  
+  // Update pin states
+  if(transmit_only)
+  {
+    pinChange.pin_state = pinStatePacket.pin_state;
+    pinStatePacket.pin_state = 0;
+
+    for(i=0;i<PIN_MAX;i++)
+    {
+      pinStatePacket.pin_state |= (pins_user_get_adc(i)?1:0) << i;
+    }
+    if (pinChange.pin_state != pinStatePacket.pin_state) {
+      sendUpdateNow = true;
+    }
+  }
+  // Set pin state if we have a valid packet
+  else if (FOOTER_CHECK == pinStatePacket.footer && pinChange.pin_state != pinStatePacket.pin_state)
+  {
+    pinChange.pin_state = pinStatePacket.pin_state;
+    
+    for(i=0;i<PIN_AB_MAX;i++)
+    {
+      if(AT_DISABLE_PIN == i || AT_V_GND_PIN == i)
+      {
+        continue;
+      }
+      pins_user_set_value(i, (pinStatePacket.pin_state & (1 << i))?1:0);
+    }
+  }
+  
+  // check the AT_DISABLE_PIN
+  if(AT_DISABLE_PIN < PIN_MAX)
+  {
+    at_mode = pins_user_get_adc(AT_DISABLE_PIN)?1:0;
+  }
 }
 
 #endif // PIN_MAX > 0

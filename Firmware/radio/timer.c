@@ -43,8 +43,8 @@ INTERRUPT(T3_ISR, INTERRUPT_TIMER3)
 	// re-arm the interrupt by clearing TF3H
 	TMR3CN = 0x04;
 
-	// call the AT parser tick
-	at_timer();
+//	// call the AT parser tick
+//	at_timer();
 
 	// update the delay counter
 	if (delay_counter > 0)

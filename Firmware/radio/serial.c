@@ -34,7 +34,6 @@
 ///
 
 #include "serial.h"
-#include "packet.h"
 
 // Serial rx/tx buffers.
 //
@@ -121,23 +120,6 @@ serial_interrupt(void) __interrupt(INTERRUPT_UART0)
 			if (!at_cmd_ready) {
 				at_input(c);
 			}
-		} else {
-			// run the byte past the +++ detector
-			at_plus_detector(c);
-
-			// and queue it for general reception
-			if (BUF_NOT_FULL(rx)) {
-				BUF_INSERT(rx, c);
-			} else {
-				if (errors.serial_rx_overflow != 0xFFFF) {
-					errors.serial_rx_overflow++;
-				}
-			}
-#ifdef SERIAL_CTS
-			if (BUF_FREE(rx) < SERIAL_CTS_THRESHOLD_LOW) {
-				SERIAL_CTS = true;
-			}
-#endif
 		}
 	}
 
@@ -512,9 +494,5 @@ void serial_device_set_speed(register uint8_t speed)
 	// set the rates in the UART
 	TH1 = serial_rates[i].th1;
 	CKCON = (CKCON & ~0x0b) | serial_rates[i].ckcon;
-
-	// tell the packet layer how fast the serial link is. This is
-	// needed for packet framing timeouts
-	packet_set_serial_speed(speed*125UL);	
 }
 

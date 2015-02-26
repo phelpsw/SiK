@@ -59,7 +59,6 @@ static void	at_ok(void);
 static void	at_error(void);
 static void	at_i(void);
 static void	at_s(void);
-static void	at_r(void);
 static void	at_ampersand(void);
 static void	at_p(void);
 static void	at_plus(void);
@@ -106,24 +105,12 @@ at_input(register uint8_t c)
 		// to minimise the risk of locking up on reception
 		// of an accidental escape sequence.
 
-		at_mode_active = 0;
+		at_mode_active = 1;
 		at_cmd_len = 0;
 		break;
 	}
 }
 #pragma restore
-
-// +++ detector state machine
-//
-// states:
-//
-// wait_for_idle:	-> wait_for_plus1, count = 0 after 1s
-//
-// wait_for_plus:	-> wait_for_idle if char != +
-//			-> wait_for_plus, count++ if count < 3
-// wait_for_enable:	-> enabled after 1s
-//			-> wait_for_idle if any char
-//
 
 #define	ATP_WAIT_FOR_IDLE	0
 #define ATP_WAIT_FOR_PLUS1	1
@@ -136,92 +123,11 @@ at_input(register uint8_t c)
 static __pdata uint8_t	at_plus_state;
 static __pdata uint8_t	at_plus_counter = ATP_COUNT_1S;
 
-#pragma save
-#pragma nooverlay
-void
-at_plus_detector(register uint8_t c)
-{
-	// If we get a character that's not '+', unconditionally
-	// reset the state machine to wait-for-idle; this will
-	// restart the 1S timer.
-	//
-	if (c != (uint8_t)'+')
-		at_plus_state = ATP_WAIT_FOR_IDLE;
-
-	// We got a plus; handle it based on our current state.
-	//
-	switch (at_plus_state) {
-
-	case ATP_WAIT_FOR_PLUS1:
-	case ATP_WAIT_FOR_PLUS2:
-		at_plus_state++;
-		break;
-
-	case ATP_WAIT_FOR_PLUS3:
-		at_plus_state = ATP_WAIT_FOR_ENABLE;
-		at_plus_counter = ATP_COUNT_1S;
-		break;
-
-	default:
-		at_plus_state = ATP_WAIT_FOR_IDLE;
-		// FALLTHROUGH
-	case ATP_WAIT_FOR_IDLE:
-	case ATP_WAIT_FOR_ENABLE:
-		at_plus_counter = ATP_COUNT_1S;
-		break;
-	}
-}
-#pragma restore
-
-#pragma save
-#pragma nooverlay
-void
-at_timer(void)
-{
-	// if the counter is running
-	if (at_plus_counter > 0) {
-
-		// if it reaches zero, the timeout has expired
-		if (--at_plus_counter == 0) {
-
-			// make the relevant state change
-			switch (at_plus_state) {
-			case ATP_WAIT_FOR_IDLE:
-				at_plus_state = ATP_WAIT_FOR_PLUS1;
-				break;
-
-			case ATP_WAIT_FOR_ENABLE:
-				at_mode_active = true;
-				at_plus_state = ATP_WAIT_FOR_IDLE;
-
-				// stuff an empty 'AT' command to get the OK prompt
-				at_cmd[0] = 'A';
-				at_cmd[1] = 'T';
-				at_cmd[2] = '\0';
-				at_cmd_len = 2;
-				at_cmd_ready = true;
-				break;
-			default:
-				// should never happen, but otherwise harmless
-			}
-		}
-	}
-}
-#pragma restore
-
 void
 at_command(void)
 {
 	// require a command with the AT prefix
 	if (at_cmd_ready) {
-		if ((at_cmd_len >= 2) && (at_cmd[0] == 'R') && (at_cmd[1] == 'T')) {
-			// remote AT command - send it to the tdm
-			// system to send to the remote radio
-			tdm_remote_at();
-			at_cmd_len = 0;
-			at_cmd_ready = false;
-			return;
-		}
 		
 		if ((at_cmd_len >= 2) && (at_cmd[0] == 'A') && (at_cmd[1] == 'T')) {
 
@@ -242,15 +148,12 @@ at_command(void)
 			case 'P':
 				at_p();
 				break;
-			case 'O':		// O -> go online (exit command mode)
-				at_plus_counter = ATP_COUNT_1S;
-				at_mode_active = 0;
-				break;
+//			case 'O':		// O -> go online (exit command mode)
+//				at_plus_counter = ATP_COUNT_1S;
+//				at_mode_active = 0;
+//				break;
 			case 'S':
 				at_s();
-				break;
-			case 'R':
-				at_r();
 				break;
 
 			case 'Z':
@@ -346,20 +249,13 @@ at_i(void)
 						 param_s_name(id),
 						 (unsigned long)param_s_get(id));
 		}
-		// convenient way of showing all parameters
-		for (id = 0; id < PARAM_R_MAX; id++) {
-			printf("R%u:%s=%lu\n",
-						 (unsigned)id,
-						 param_r_name(id),
-						 (unsigned long)param_r_get(id));
-		}
 		return;
 	}
 	case '6':
-		tdm_report_timing();
+//		tdm_report_timing();
 		return;
 	case '7':
-		tdm_show_rssi();
+//		tdm_show_rssi();
 		return;
 	default:
 		at_error();
@@ -403,39 +299,6 @@ at_s(void)
 }
 
 static void
-at_r(void)
-{
-	__pdata uint8_t		sreg;
-	
-	// get the register number first
-	idx = 3;
-	at_parse_number();
-	sreg = at_num;
-	// validate the selected sreg
-	if (sreg >= PARAM_R_MAX) {
-		at_error();
-		return;
-	}
-	
-	switch (at_cmd[idx]) {
-		case '?':
-			at_num = param_r_get(sreg);
-			printf("%lu\n", at_num);
-			return;
-			
-		case '=':
-			idx++;
-			at_parse_number();
-			if (param_r_set(sreg, at_num)) {
-				at_ok();
-				return;
-			}
-			break;
-	}
-	at_error();
-}
-
-static void
 at_ampersand(void)
 {
 	switch (at_cmd[3]) {
@@ -467,7 +330,7 @@ at_ampersand(void)
 		break;
 
 	case 'P':
-		tdm_change_phase();
+//		tdm_change_phase();
 		break;
 
 	case 'T':
@@ -578,7 +441,7 @@ at_plus(void)
 		at_parse_number();
 		PCA0CPH0 = at_num & 0xFF;
 		radio_set_diversity(false);
-    disable_rssi_hunt();
+//    disable_rssi_hunt();
 		at_ok();
 		return;
 	case 'C': // AT+Cx=y write calibration value

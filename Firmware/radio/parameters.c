@@ -55,11 +55,11 @@ __code const struct parameter_s_info {
 	{"FORMAT",         PARAM_FORMAT_CURRENT},
 	{"SERIAL_SPEED",   57}, // match APM default of 57600
 	{"AIR_SPEED",      64}, // relies on MAVLink flow control
-	{"NETID",          25},
+  {"NETID",          25},
 	{"TXPOWER",        20},
-	{"ECC",             0},
-	{"MAVLINK",         0},
-	{"OPPRESEND",       0},
+	{"TRANSMIT",        0},
+  {"CHANNEL",         1},
+	{"XX",              0},
 	{"MIN_FREQ",        0},
 	{"MAX_FREQ",        0},
 	{"NUM_CHANNELS",    0},
@@ -70,14 +70,6 @@ __code const struct parameter_s_info {
 	{"MAX_WINDOW",    131},
 };
 
-__code const struct parameter_r_info {
-	const char	*name;
-	param_t		default_value;
-} parameter_r_info[PARAM_R_MAX] = {
-	{"TARGET_RSSI",     255},
-	{"HYSTERESIS_RSSI", 50},
-};
-
 /// In-RAM parameter store.
 ///
 /// It seems painful to have to do this, but we need somewhere to
@@ -85,15 +77,11 @@ __code const struct parameter_r_info {
 /// page anyway.
 ///
 __xdata param_t	parameter_s_values[PARAM_S_MAX];
-__xdata param_t	parameter_r_values[PARAM_R_MAX];
 
 // Three extra bytes, 1 for the number of params and 2 for the checksum
 #define PARAM_S_FLASH_START   0
 #define PARAM_S_FLASH_END     (PARAM_S_FLASH_START + sizeof(parameter_s_values) + 3)
 
-// Three extra bytes, 1 for the number of params and 2 for the checksum, starts at position 128
-#define PARAM_R_FLASH_START   (2<<6)
-#define PARAM_R_FLASH_END     (PARAM_R_FLASH_START + sizeof(parameter_r_values) + 3)
 
 #if PIN_MAX > 0
 __code const pins_user_info_t pins_defaults = PINS_USER_INFO_DEFAULT;
@@ -102,7 +90,7 @@ __xdata pins_user_info_t pin_values[PIN_MAX];
 // Place the start away from the other params to allow for expantion 2<<7 = 256
 #define PIN_FLASH_START       (2<<7)
 #define PIN_FLASH_END         (PIN_FLASH_START + sizeof(pin_values) + 2)
-#endif
+#endif // PIN_MAX
 
 
 
@@ -135,17 +123,11 @@ param_s_check(__pdata enum Param_S_ID id, __data uint32_t val)
 			return false;
 		break;
 
-	case PARAM_ECC:
-	case PARAM_OPPRESEND:
-		// boolean 0/1 only
-		if (val > 1)
-			return false;
-		break;
-
-	case PARAM_MAVLINK:
-		if (val > 2)
-			return false;
-		break;
+//	case PARAM_OPPRESEND:
+//		// boolean 0/1 only
+//		if (val > 1)
+//			return false;
+//		break;
 
 	case PARAM_MAX_WINDOW:
 		// 131 milliseconds == 0x1FFF 16 usec ticks,
@@ -192,16 +174,6 @@ param_s_set(__data enum Param_S_ID param, __pdata param_t value)
 		lbt_rssi = value;
 		break;
 
-	case PARAM_MAVLINK:
-		feature_mavlink_framing = (uint8_t) value;
-		value = feature_mavlink_framing;
-		break;
-
-	case PARAM_OPPRESEND:
-		feature_opportunistic_resend = value?true:false;
-		value = feature_opportunistic_resend?1:0;
-		break;
-
 	case PARAM_RTSCTS:
 		feature_rtscts = value?true:false;
 		value = feature_rtscts?1:0;
@@ -222,59 +194,6 @@ param_s_get(__data enum Param_S_ID param)
 	if (param >= PARAM_S_MAX)
 		return 0;
 	return parameter_s_values[param];
-}
-
-static bool
-param_r_check(__pdata enum Param_R_ID id, __data uint32_t val)
-{
-	// parameter value out of range - fail
-	if (id >= PARAM_R_MAX)
-		return false;
-	
-	switch (id) {
-		case PARAM_R_TARGET_RSSI:
-			if (val < 50 || 255 < val)
-				return false;
-			break;
-
-		case PARAM_R_HYSTERESIS_RSSI:
-			if (val < 20 || 50 < val)
-				return false;
-			break;
-			
-		default:
-			// no sanity check for this value
-			break;
-	}
-	return true;
-}
-
-bool
-param_r_set(__data enum Param_R_ID param, __pdata param_t value)
-{
-	// Sanity-check the parameter value first.
-	if (!param_r_check(param, value))
-		return false;
-	
-	// some parameters we update immediately
-	switch (param) {
-//		case PARAM_R_TARGET_RSSI:
-//			break;
-		default:
-			break;
-	}
-	
-	parameter_r_values[param] = value;
-	
-	return true;
-}
-
-param_t
-param_r_get(__data enum Param_R_ID param)
-{
-	if (param >= PARAM_R_MAX)
-		return 0;
-	return parameter_r_values[param];
 }
 
 static bool
@@ -329,13 +248,6 @@ __critical {
 	
 	if(!read_params((__xdata uint8_t *)parameter_s_values, PARAM_S_FLASH_START+1, expected))
 		return false;
-
-	// read and verify params
-	expected = flash_read_scratch(PARAM_R_FLASH_START);
-	if (expected > sizeof(parameter_r_values))
-		return false;
-	if(!read_params((__xdata uint8_t *)parameter_r_values, PARAM_R_FLASH_START+1, expected))
-		return false;
 	
 	// decide whether we read a supported version of the structure
 	if ((param_t) PARAM_FORMAT_CURRENT != parameter_s_values[PARAM_FORMAT]) {
@@ -346,12 +258,6 @@ __critical {
 	for (i = 0; i < PARAM_S_MAX; i++) {
 		if (!param_s_check(i, parameter_s_values[i])) {
 			parameter_s_values[i] = parameter_s_info[i].default_value;
-		}
-	}
-	
-	for (i = 0; i < PARAM_R_MAX; i++) {
-		if (!param_r_check(i, parameter_r_values[i])) {
-			parameter_r_values[i] = parameter_r_info[i].default_value;
 		}
 	}
 	
@@ -380,10 +286,6 @@ __critical {
 	// write S params
 	flash_write_scratch(PARAM_S_FLASH_START, sizeof(parameter_s_values));
 	write_params((__xdata uint8_t *)parameter_s_values, PARAM_S_FLASH_START+1, sizeof(parameter_s_values));
-
-	// write R params
-	flash_write_scratch(PARAM_R_FLASH_START, sizeof(parameter_r_values));
-	write_params((__xdata uint8_t *)parameter_r_values, PARAM_R_FLASH_START+1, sizeof(parameter_r_values));
 	
 	// write pin params
 #if PIN_MAX > 0
@@ -400,11 +302,6 @@ param_default(void)
 	// set all parameters to their default values
 	for (i = 0; i < PARAM_S_MAX; i++) {
 		parameter_s_values[i] = parameter_s_info[i].default_value;
-	}
-
-	// set all parameters to their default values
-	for (i = 0; i < PARAM_R_MAX; i++) {
-		parameter_r_values[i] = parameter_r_info[i].default_value;
 	}
 	
 #if PIN_MAX > 0
@@ -437,27 +334,6 @@ param_s_name(__data enum ParamID param)
 	return 0;
 }
 
-enum ParamID
-param_r_id(__data char * __pdata name)
-{
-	__pdata uint8_t i;
-	
-	for (i = 0; i < PARAM_R_MAX; i++) {
-		if (!strcmp(name, parameter_r_info[i].name))
-			break;
-	}
-	return i;
-}
-
-const char *__code
-param_r_name(__data enum ParamID param)
-{
-	if (param < PARAM_R_MAX) {
-		return parameter_r_info[param].name;
-	}
-	return 0;
-}
-
 // constraint for parameter values
 uint32_t constrain(__pdata uint32_t v, __pdata uint32_t min, __pdata uint32_t max)
 {
@@ -466,17 +342,10 @@ uint32_t constrain(__pdata uint32_t v, __pdata uint32_t min, __pdata uint32_t ma
 	return v;
 }
 
-// rfd900a calibration stuff
-// Change for next rfd900 revision
+// rfd900a/p calibration stuff
 #if defined BOARD_rfd900a || defined BOARD_rfd900p
 static __at(FLASH_CALIBRATION_AREA) uint8_t __code calibration[FLASH_CALIBRATION_AREA_SIZE];
-
-//#ifdef BOARD_rfd900p
-//static __at(FLASH_CALIBRATION_CRC) uint16_t __code calibration_crc;
-//       __xdata uint8_t calData[FLASH_CALIBRATION_AREA_SIZE];
-//#else
 static __at(FLASH_CALIBRATION_CRC) uint8_t __code calibration_crc;
-//#endif
 
 static void
 flash_write_byte(uint16_t address, uint8_t c) __reentrant __critical
@@ -512,59 +381,6 @@ calibration_set(uint8_t idx, uint8_t value) __reentrant
 	return false;
 }
 
-//#ifdef BOARD_rfd900p
-//uint8_t
-//calibration_get(uint8_t level) __reentrant
-//{
-//	uint16_t crc = 0;
-//  
-//  // calculate checksum
-//  printf("val1 %d - val2 %d\n",calibration[0], calibration[1]);
-//  memcpy(calData, calibration, FLASH_CALIBRATION_AREA_SIZE);
-//  
-//  crc = crc16(FLASH_CALIBRATION_AREA_SIZE, calibration);
-//  
-//	if (calibration_crc != 0xFF && calibration_crc == crc && level <= BOARD_MAXTXPOWER)
-//	{
-//    printf("crca %d - crcb %d - calret %d", calibration_crc, crc, calibration[level]);
-//		return calibration[level];
-//	}
-//  printf("Nope - crca %d - crcb %d - calret %d", calibration_crc, crc, calibration[level]);
-//	return 0xFF;
-//}
-//
-//bool
-//calibration_lock() __reentrant
-//{
-//	uint8_t idx;
-//	uint16_t crc = 0;
-//	
-//  
-//	// check that all entries are written
-//	if (flash_read_byte(FLASH_CALIBRATION_CRC_HIGH) == 0xFF)
-//	{
-//		for (idx=0; idx < FLASH_CALIBRATION_AREA_SIZE; idx++)
-//		{
-//			if (flash_read_byte(FLASH_CALIBRATION_AREA_HIGH + idx) == 0xFF)
-//			{
-//				printf("dBm level %u not calibrated\n",idx);
-//				return false;
-//			}
-//		}
-//		
-//    // write checksum
-//    crc = crc16(FLASH_CALIBRATION_AREA_SIZE, calibration);
-//		flash_write_byte(FLASH_CALIBRATION_CRC_HIGH, crc&0xFF);
-//    flash_write_byte(FLASH_CALIBRATION_CRC_HIGH+1, crc>>8);
-//    
-//		// lock the first and last pages
-//		// can only be reverted by reflashing the bootloader
-//		flash_write_byte(FLASH_LOCK_BYTE, 0xFE);
-//		return true;
-//	}
-//	return false;
-//}
-//#else
 uint8_t
 calibration_get(uint8_t level) __reentrant
 {
@@ -613,5 +429,4 @@ calibration_lock() __reentrant
 	}
 	return false;
 }
-//#endif // BOARD_rfd900p
 #endif // BOARD_rfd900a/p

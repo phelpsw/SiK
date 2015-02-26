@@ -53,18 +53,18 @@ extern void tdm_init(void);
 ///
 extern void tdm_serial_loop(void);
 
-/// report tdm timings
-///
-extern void tdm_report_timing(void);
+///// report tdm timings
+/////
+//extern void tdm_report_timing(void);
 
-/// dispatch a remote AT command
-extern void tdm_remote_at(void);
+///// dispatch a remote AT command
+//extern void tdm_remote_at(void);
 
-/// change tdm phase (for testing recovery)
-extern void tdm_change_phase(void);
+///// change tdm phase (for testing recovery)
+//extern void tdm_change_phase(void);
 
-/// show RSSI information
-extern void tdm_show_rssi(void);
+///// show RSSI information
+//extern void tdm_show_rssi(void);
 
 /// the long term duty cycle we are aiming for
 extern __pdata uint8_t duty_cycle;
@@ -72,7 +72,7 @@ extern __pdata uint8_t duty_cycle;
 /// the LBT threshold
 extern __pdata uint8_t lbt_rssi;
 
-/// Disable the hunting of the rssi power levels
-extern void disable_rssi_hunt();
+///// Disable the hunting of the rssi power levels
+//extern void disable_rssi_hunt();
 
 #endif // _TDM_H_
