@@ -49,7 +49,7 @@
 #define PINS_USER_MAX 0
 #endif
 
-#define PINS_ABS_MAX 10
+#define PINS_ABS_MAX 10 // The packet can only support 4 pins
 #define PIN_MAX (PINS_USER_MAX < PINS_ABS_MAX ? PINS_USER_MAX : PINS_ABS_MAX)
 
 enum pin_state { PIN_OUTPUT=true, PIN_INPUT=false,
@@ -67,9 +67,9 @@ typedef struct pins_user_info {
 } pins_user_info_t;
 
 struct pinState_packet {
-  uint16_t no_pins;
-  uint16_t pin_state;
-  uint16_t footer;
+  uint16_t no_pins:4;
+  uint16_t pin_state:4;
+  uint16_t footer:8;
 };
 
 #define PINS_USER_INFO_DEFAULT {PIN_OUTPUT, PIN_LOW, PIN_NULL}

@@ -41,7 +41,7 @@
 // Pin location in the array
 #define AT_DISABLE_PIN 4
 #define AT_V_GND_PIN   5
-#define FOOTER_CHECK 0xA5BF
+#define FOOTER_CHECK 0xA5
 
 // pin_values defined as extern in parameters
 __code const struct pins_user_map {
@@ -77,12 +77,15 @@ __code const struct pins_user_map {
 __pdata struct pinState_packet pinStatePacket;
 bool at_mode, sendUpdateNow;
 
+// At max we can send 4 pin states
+#define PIN_SEND_MAX (4 < PIN_MAX ? 4 : PIN_MAX)
+
 void
 pins_user_init(void)
 {
 	__pdata uint8_t i;
 	
-  pinStatePacket.no_pins = PIN_MAX;
+  pinStatePacket.no_pins = PIN_SEND_MAX;
   pinStatePacket.footer = FOOTER_CHECK;
 	// Set the Default pin behaviour
   if(transmit_only)
@@ -102,7 +105,7 @@ pins_user_init(void)
     }
   }
   
-  if(AT_V_GND_PIN < PIN_MAX)
+  if(AT_V_GND_PIN < PINS_USER_MAX)
   {
     pins_user_set_io(AT_DISABLE_PIN, PIN_INPUT);
     pins_user_set_value(AT_DISABLE_PIN, PIN_HIGH);
@@ -115,7 +118,7 @@ pins_user_init(void)
 bool
 pins_user_set_io(__pdata uint8_t pin, bool in_out)
 {
-	if (PIN_MAX > pin)
+	if (PINS_USER_MAX > pin)
 	{
 		pin_values[pin].output = in_out;
 		pin_values[pin].pin_mirror = PIN_NULL;
@@ -193,7 +196,7 @@ bool
 pins_user_set_value(__pdata uint8_t pin, bool high_low)
 {
 	pin_values[pin].pin_dir = high_low;
-	if(PIN_MAX > pin && pin_values[pin].pin_mirror == PIN_NULL)
+	if(PINS_USER_MAX > pin && pin_values[pin].pin_mirror == PIN_NULL)
 	{
 		switch(pins_user_map[pin].port)
 		{
@@ -258,7 +261,7 @@ pins_user_get_value(__pdata uint8_t pin)
 uint8_t
 pins_user_get_adc(__pdata uint8_t pin)
 {
-	if(PIN_MAX > pin && pin_values[pin].output == PIN_INPUT)
+	if(PINS_USER_MAX > pin && pin_values[pin].output == PIN_INPUT)
 	{
 		switch(pins_user_map[pin].port)
 		{
@@ -279,7 +282,7 @@ pins_user_get_adc(__pdata uint8_t pin)
 	return PIN_ERROR;
 }
 
-#define PIN_AB_MAX (pinStatePacket.no_pins < PIN_MAX ? pinStatePacket.no_pins : PIN_MAX)
+#define PIN_AB_MAX ((uint8_t) pinStatePacket.no_pins < PIN_SEND_MAX ? (uint8_t) pinStatePacket.no_pins : PIN_SEND_MAX)
 
 void
 pins_user_check()
@@ -293,7 +296,7 @@ pins_user_check()
     pinChange.pin_state = pinStatePacket.pin_state;
     pinStatePacket.pin_state = 0;
 
-    for(i=0;i<PIN_MAX;i++)
+    for(i=0;i<PIN_SEND_MAX;i++)
     {
       pinStatePacket.pin_state |= (pins_user_get_adc(i)?1:0) << i;
     }
@@ -308,16 +311,17 @@ pins_user_check()
     
     for(i=0;i<PIN_AB_MAX;i++)
     {
-      if(AT_DISABLE_PIN == i || AT_V_GND_PIN == i)
-      {
-        continue;
-      }
+//      // PinMax is 4 so these pins arn't touched
+//      if(AT_DISABLE_PIN == i || AT_V_GND_PIN == i)
+//      {
+//        continue;
+//      }
       pins_user_set_value(i, (pinStatePacket.pin_state & (1 << i))?1:0);
     }
   }
   
   // check the AT_DISABLE_PIN
-  if(AT_DISABLE_PIN < PIN_MAX)
+  if(AT_DISABLE_PIN < PINS_USER_MAX)
   {
     at_mode = pins_user_get_adc(AT_DISABLE_PIN)?1:0;
   }

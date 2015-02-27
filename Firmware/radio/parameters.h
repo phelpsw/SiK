@@ -53,7 +53,7 @@ enum Param_S_ID {
 	PARAM_TXPOWER,          // transmit power (dBm)
 	PARAM_TRANSMIT,         // this node transmits only
   PARAM_CHANNEL,          // channel to listen/transmitt on
-	PARAM_YY,
+	PARAM_XX,
 	PARAM_MIN_FREQ,         // min frequency in MHz
 	PARAM_MAX_FREQ,         // max frequency in MHz
 	PARAM_NUM_CHANNELS,     // number of hopping channels
@@ -61,7 +61,7 @@ enum Param_S_ID {
 	PARAM_LBT_RSSI,         // listen before talk threshold
 	PARAM_MANCHESTER,       // enable manchester encoding
 	PARAM_RTSCTS,           // enable hardware flow control
-	PARAM_MAX_WINDOW,       // The maximum window size allowed
+	PARAM_YY,               // The maximum window size allowed
 	PARAM_S_MAX             // must be last
 };
 

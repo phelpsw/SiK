@@ -216,7 +216,7 @@ tdm_serial_loop(void)
 	_canary = 42;
 
 	for (;;) {
-		__pdata uint8_t	len;
+		__pdata uint8_t	len, i;
 		__pdata uint16_t tnow;
 
 		if (_canary != 42) {
@@ -276,12 +276,21 @@ tdm_serial_loop(void)
       continue;
     }
 
-    if ((tnow - last_t) > 32768 || (sendUpdateNow && (tnow - last_t) > (packet_latency*2)))
+    if ((tnow - last_t) > 32768 || sendUpdateNow)
     {
       last_t = tnow;
       // start transmitting the packet
       memcpy(pbuf, &pinStatePacket, sizeof(pinStatePacket));
-      radio_transmit(sizeof(pinStatePacket), pbuf, tdm_state_remaining + (silence_period/2));
+      
+      if(sendUpdateNow)
+      {
+        for (i=0; i<5; i++) {
+          while (radio_transmit_in_progress()) {}
+          radio_transmit(sizeof(pinStatePacket), pbuf, silence_period/2);
+        }
+      }
+      while (radio_transmit_in_progress()) {}
+      radio_transmit(sizeof(pinStatePacket), pbuf, silence_period/2);
       sendUpdateNow = false;
     }
 	}

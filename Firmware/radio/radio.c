@@ -148,6 +148,18 @@ radio_receive_in_progress(void)
 	return false;
 }
 
+// check if a packet is being received
+//
+bool
+radio_transmit_in_progress(void)
+{
+  // check the status register to see if a receive is in progress
+  if (register_read(EZRADIOPRO_EZMAC_STATUS) & EZRADIOPRO_PKTX) {
+    return true;
+  }
+  return false;
+}
+
 // return true if a packet preamble has been detected. This means that
 // a packet may be coming in
 //
@@ -163,8 +175,6 @@ radio_preamble_detected(void)
 	EX0_RESTORE;
 	return false;
 }
-
-
 
 // return the RSSI from the last packet
 //
@@ -227,8 +237,6 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 	__pdata uint16_t tstart;
 	bool transmit_started;
 	__data uint8_t n;
-
-//  printf("l-%d, timeout-%d\n",length,timeout_ticks);
   
 	if (length > sizeof(radio_buffer)) {
 		panic("oversized packet");
@@ -372,7 +380,6 @@ radio_transmit(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint16_t t
 #if defined BOARD_rfd900a || defined BOARD_rfd900p
 	PA_ENABLE = 1;		// Set PA_Enable to turn on PA prior to TX cycle
 #endif
-	
   ret = radio_transmit_simple(length, buf, timeout_ticks);
 #if defined BOARD_rfd900a || defined BOARD_rfd900p
 	PA_ENABLE = 0;		// Set PA_Enable to off the PA after TX cycle
@@ -654,10 +661,10 @@ radio_configure(__pdata uint8_t air_rate)
 	register_write(EZRADIOPRO_TX_FIFO_CONTROL_2, TX_FIFO_THRESHOLD_LOW);
 	register_write(EZRADIOPRO_RX_FIFO_CONTROL, RX_FIFO_THRESHOLD_HIGH);
 
-	settings.preamble_length = 16;
+  settings.preamble_length = 16;
 
 	register_write(EZRADIOPRO_PREAMBLE_LENGTH, settings.preamble_length); // nibbles 
-	register_write(EZRADIOPRO_PREAMBLE_DETECTION_CONTROL, 5<<3); // 5 nibbles
+  register_write(EZRADIOPRO_PREAMBLE_DETECTION_CONTROL, 5<<3); // 5 nibbles
 
 	// setup minimum output power during startup
 	radio_set_transmit_power(0);

@@ -54,8 +54,8 @@ __code const struct parameter_s_info {
 } parameter_s_info[PARAM_S_MAX] = {
 	{"FORMAT",         PARAM_FORMAT_CURRENT},
 	{"SERIAL_SPEED",   57}, // match APM default of 57600
-	{"AIR_SPEED",      64}, // relies on MAVLink flow control
-  {"NETID",          25},
+	{"AIR_SPEED",     250}, // relies on MAVLink flow control
+  {"NETID",          15},
 	{"TXPOWER",        20},
 	{"TRANSMIT",        0},
   {"CHANNEL",         1},
@@ -67,7 +67,7 @@ __code const struct parameter_s_info {
 	{"LBT_RSSI",        0},
 	{"MANCHESTER",      0},
 	{"RTSCTS",          1},
-	{"MAX_WINDOW",    131},
+	{"xx",              0},
 };
 
 /// In-RAM parameter store.
@@ -123,17 +123,9 @@ param_s_check(__pdata enum Param_S_ID id, __data uint32_t val)
 			return false;
 		break;
 
-//	case PARAM_OPPRESEND:
-//		// boolean 0/1 only
-//		if (val > 1)
-//			return false;
-//		break;
-
-	case PARAM_MAX_WINDOW:
-		// 131 milliseconds == 0x1FFF 16 usec ticks,
-		// which is the maximum we can handle with a 13
-		// bit trailer for window remaining
-		if (val > 131)
+	case PARAM_TRANSMIT:
+		// boolean 0/1 only
+		if (val > 1)
 			return false;
 		break;
 
