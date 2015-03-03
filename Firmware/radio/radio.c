@@ -1058,14 +1058,15 @@ radio_temperature(void)
 
 /// Turn off radio diversity
 ///
+#define DIV_MODE 0x01 // 0x80
 void
 radio_set_diversity(bool enable)
 {
-	if (enable)
+  if (enable)
 	{
 		register_write(EZRADIOPRO_GPIO2_CONFIGURATION, 0x18);
 		// see table 23.8, page 279
-		register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2, (register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2) & ~EZRADIOPRO_ANTDIV_MASK) | 0x80);
+		register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2, (register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2) & ~EZRADIOPRO_ANTDIV_MASK) | DIV_MODE);
 	}
 	else
 	{

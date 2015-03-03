@@ -121,6 +121,9 @@ main(void)
 	// do radio initialisation
 	radio_init();
 
+#if defined BOARD_rfd900a || defined BOARD_rfd900p
+  PA_ENABLE = 0;		// Set PA_Enable to off
+#endif
 	// turn on the receiver
 	if (!radio_receiver_on()) {
 		panic("failed to enable receiver");

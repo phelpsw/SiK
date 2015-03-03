@@ -180,16 +180,19 @@ link_update(void)
   if(transmit_only)
   {
     LED_RADIO = blink_state;
+    pins_user_set_value(5, blink_state);
     LED_ACTIVITY = !blink_state;
   }
   else
   {
     LED_RADIO = LED_OFF;
     LED_ACTIVITY = !blink_state;
+    pins_user_set_value(5, PIN_LOW);
     if(received_packet)
     {
       received_packet = false;
       LED_RADIO = LED_ON;
+      pins_user_set_value(5, PIN_HIGH);
     }
   }
   blink_state = !blink_state;
@@ -234,13 +237,13 @@ tdm_serial_loop(void)
     
     if(at_mode)
     {
-      LED_ACTIVITY = LED_ON;
       at_mode_active = 1;
       // give the AT command processor a chance to handle a command
       at_command();
     }
     else
     {
+      LED_ACTIVITY = LED_ON;
       at_mode_active = 0;
     }
 
@@ -276,7 +279,8 @@ tdm_serial_loop(void)
       continue;
     }
 
-    if ((tnow - last_t) > 32768 || sendUpdateNow)
+    // force update every 0.25 seconds
+    if ((tnow - last_t) > 16384 || sendUpdateNow)
     {
       last_t = tnow;
       // start transmitting the packet

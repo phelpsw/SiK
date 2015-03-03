@@ -40,7 +40,6 @@
 
 // Pin location in the array
 #define AT_DISABLE_PIN 4
-#define AT_V_GND_PIN   5
 #define FOOTER_CHECK 0xA5
 
 // pin_values defined as extern in parameters
@@ -105,13 +104,17 @@ pins_user_init(void)
     }
   }
   
-  if(AT_V_GND_PIN < PINS_USER_MAX)
+  if(AT_DISABLE_PIN <= PINS_USER_MAX)
   {
     pins_user_set_io(AT_DISABLE_PIN, PIN_INPUT);
     pins_user_set_value(AT_DISABLE_PIN, PIN_HIGH);
-    
-    pins_user_set_io(AT_V_GND_PIN, PIN_OUTPUT);
-    pins_user_set_value(AT_V_GND_PIN, PIN_LOW);
+  }
+  
+  if( 5 <= PINS_USER_MAX )
+  {
+    // Case LED
+    pins_user_set_io(5, PIN_OUTPUT);
+    pins_user_set_value(5, PIN_LOW);
   }
 }
 
@@ -311,7 +314,7 @@ pins_user_check()
     
     for(i=0;i<PIN_AB_MAX;i++)
     {
-//      // PinMax is 4 so these pins arn't touched
+//      // PIN_SEND_MAX is 4 so these pins arn't touched
 //      if(AT_DISABLE_PIN == i || AT_V_GND_PIN == i)
 //      {
 //        continue;
@@ -321,7 +324,7 @@ pins_user_check()
   }
   
   // check the AT_DISABLE_PIN
-  if(AT_DISABLE_PIN < PINS_USER_MAX)
+  if(AT_DISABLE_PIN <= PINS_USER_MAX)
   {
     at_mode = pins_user_get_adc(AT_DISABLE_PIN)?1:0;
   }
