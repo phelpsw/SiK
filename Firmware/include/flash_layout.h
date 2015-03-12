@@ -45,8 +45,7 @@
 #define FLASH_PAGE_SHIFT	10
 #define FLASH_APP_START		0x0400		// 1 page reserved for bootloader
 
-
-#ifdef BOARD_rfd900u
+#if defined BOARD_rfd900u || defined BOARD_rfd900p
 // WARNING You need to select Bank 3 for these address to work. (p125)
 #define FLASH_INFO_PAGE		0xFC00		// 1 page reserved for bootloader (In Bank3)
 #define FLASH_LOCK_BYTE		0xFFFF		// Bank3
@@ -72,7 +71,7 @@
 //
 #define FLASH_FREQUENCY_BYTE	(FLASH_LOCK_BYTE - 1)
 
-#ifdef BOARD_rfd900a
+#if defined BOARD_rfd900a || defined BOARD_rfd900p
 // locked and unlocked areas to store power calibration info
 #define FLASH_CALIBRATION_AREA_SIZE (31)
 #define FLASH_CALIBRATION_CRC_HIGH  (FLASH_FREQUENCY_BYTE - 1)

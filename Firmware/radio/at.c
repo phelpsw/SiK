@@ -515,7 +515,7 @@ at_p (void)
 static void
 at_plus(void)
 {
-#ifdef BOARD_rfd900a
+#if defined BOARD_rfd900a || defined BOARD_rfd900p
 	__pdata uint8_t		creg;
 
 	// get the register number first
@@ -564,6 +564,6 @@ at_plus(void)
 		}
 		return;
 	}
-#endif //BOARD_rfd900a
+#endif // BOARD_rfd900a || BOARD_rfd900p
 	at_error();
 }
