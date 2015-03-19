@@ -42,6 +42,10 @@
 #include "freq_hopping.h"
 #include "crc.h"
 
+#ifdef CPU_SI1030
+#include "AES/aes.h"
+#endif
+
 #define USE_TICK_YIELD 1
 
 /// the state of the tdm system
@@ -101,7 +105,7 @@ __pdata uint16_t transmit_wait;
 __pdata uint8_t duty_cycle;
 
 /// the average duty cycle we have been transmitting
-__data static float average_duty_cycle;
+__pdata static float average_duty_cycle;
 
 /// duty cycle offset due to temperature
 __pdata uint8_t duty_cycle_offset;
@@ -126,7 +130,7 @@ __pdata static uint16_t lbt_rand;
 
 /// test data to display in the main loop. Updated when the tick
 /// counter wraps, zeroed when display has happened
-__pdata uint8_t test_display;
+__xdata uint8_t test_display;
 
 /// set when we should send a statistics packet on the next round
 static __bit send_statistics;
@@ -176,9 +180,9 @@ tdm_show_rssi(void)
 static void
 display_test_output(void)
 {
-	if (test_display & AT_TEST_RSSI) {
-		tdm_show_rssi();
-	}
+  if (test_display & AT_TEST_RSSI) {
+    tdm_show_rssi();
+  }
 }
 
 
@@ -189,7 +193,7 @@ display_test_output(void)
 /// @return			flight time in 16usec ticks
 static uint16_t flight_time_estimate(__pdata uint8_t packet_len)
 {
-	return packet_latency + (packet_len * ticks_per_byte);
+  return packet_latency + (packet_len * ticks_per_byte);
 }
 
 
@@ -327,37 +331,37 @@ tdm_state_update(__pdata uint16_t tdelta)
 void
 tdm_change_phase(void)
 {
-	tdm_state = (tdm_state+2) % 4;
+  tdm_state = (tdm_state+2) % 4;
 }
 
 /// called to check temperature
 ///
 static void temperature_update(void)
 {
-	register int16_t diff;
-	if (radio_get_transmit_power() <= 20) {
-		duty_cycle_offset = 0;
-		return;
-	}
-
-	diff = radio_temperature() - MAX_PA_TEMPERATURE;
-	if (diff <= 0 && duty_cycle_offset > 0) {
-		// under temperature
-		duty_cycle_offset -= 1;
-	} else if (diff > 10) {
-		// getting hot!
-		duty_cycle_offset += 10;
-	} else if (diff > 5) {
-		// well over temperature
-		duty_cycle_offset += 5;
-	} else if (diff > 0) {
-		// slightly over temperature
-		duty_cycle_offset += 1;				
-	}
-	// limit to minimum of 20% duty cycle to ensure link stays up OK
-	if ((duty_cycle-duty_cycle_offset) < 20) {
-		duty_cycle_offset = duty_cycle - 20;
-	}
+  register int16_t diff;
+  if (radio_get_transmit_power() <= 20) {
+    duty_cycle_offset = 0;
+    return;
+  }
+  
+  diff = radio_temperature() - MAX_PA_TEMPERATURE;
+  if (diff <= 0 && duty_cycle_offset > 0) {
+    // under temperature
+    duty_cycle_offset -= 1;
+  } else if (diff > 10) {
+    // getting hot!
+    duty_cycle_offset += 10;
+  } else if (diff > 5) {
+    // well over temperature
+    duty_cycle_offset += 5;
+  } else if (diff > 0) {
+    // slightly over temperature
+    duty_cycle_offset += 1;				
+  }
+  // limit to minimum of 20% duty cycle to ensure link stays up OK
+  if ((duty_cycle-duty_cycle_offset) < 20) {
+    duty_cycle_offset = duty_cycle - 20;
+  }
 }
 
 
@@ -576,7 +580,11 @@ tdm_serial_loop(void)
 					// the serial port
 					//printf("rcv(%d,[", len);
 					LED_ACTIVITY = LED_ON;
-					serial_write_buf(pbuf, len);
+#ifdef CPU_SI1030
+          serial_decrypt_buf(pbuf, len);
+#else
+          serial_write_buf(pbuf, len);
+#endif
 					LED_ACTIVITY = LED_OFF;
 					//printf("]\n");
 				}
@@ -598,6 +606,14 @@ tdm_serial_loop(void)
 			last_link_update = tnow;
 		}
 
+#ifdef CPU_SI1030
+    // If we have any packets that need decrypting lets do it now.
+    if(decryptPackets())
+    {
+      continue;
+    }
+#endif
+    
 		if (lbt_rssi != 0) {
 			// implement listen before talk
 			if (radio_current_rssi() < lbt_rssi) {

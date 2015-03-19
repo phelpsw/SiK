@@ -34,6 +34,7 @@
 #include "timer.h"
 #include "golay.h"
 #include "crc.h"
+#include "pins_user.h"
 
 __xdata uint8_t radio_buffer[MAX_PACKET_LENGTH];
 __pdata uint8_t receive_packet_length;
@@ -76,10 +77,12 @@ static void	clear_status_registers(void);
 bool
 radio_receive_packet(uint8_t *length, __xdata uint8_t * __pdata buf)
 {
+#ifdef INCLUDE_GOLAY
 	__xdata uint8_t gout[3];
 	__data uint16_t crc1, crc2;
 	__data uint8_t errcount = 0;
 	__data uint8_t elen;
+#endif
 
 	if (!packet_received) {
 		return false;
@@ -97,15 +100,20 @@ radio_receive_packet(uint8_t *length, __xdata uint8_t * __pdata buf)
 		goto failed;		
 	}
 #endif
+  
+#ifdef INCLUDE_GOLAY
+	if (!feature_golay)
+#endif // INCLUDE_GOLAY
+  {
+	*length = receive_packet_length;
+	memcpy(buf, radio_buffer, receive_packet_length);
 
-	if (!feature_golay) {
 		// simple unencoded packets
-		*length = receive_packet_length;
-		memcpy(buf, radio_buffer, receive_packet_length);
 		radio_receiver_on();
 		return true;
 	}
 
+#ifdef INCLUDE_GOLAY
 	// decode it in the callers buffer. This relies on the
 	// in-place decode properties of the golay code. Decoding in
 	// this way allows us to overlap decoding with the next receive
@@ -173,7 +181,8 @@ radio_receive_packet(uint8_t *length, __xdata uint8_t * __pdata buf)
 		}
 	}
 
-	return true;
+  return true;
+#endif // INCLUDE_GOLAY
 
 failed:
 	if (errors.rx_errors != 0xFFFF) {
@@ -331,7 +340,10 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 
 	// start TX
 	register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_1, EZRADIOPRO_TXON | EZRADIOPRO_XTON);
-
+#ifdef DEBUG_PINS_RADIO_TX_RX
+  P1 |=  0x01;
+#endif // DEBUG_PINS_RADIO_TX_RX
+  
 	// wait for transmit complete or timeout
 	tstart = timer2_tick();
 	while ((uint16_t)(timer2_tick() - tstart) < timeout_ticks) {
@@ -376,6 +388,9 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 			if (errors.tx_errors != 0xFFFF) {
 				errors.tx_errors++;
 			}
+#ifdef DEBUG_PINS_RADIO_TX_RX
+      P1 &= ~0x01;
+#endif // DEBUG_PINS_RADIO_TX_RX
 			return false;
 		}
 
@@ -395,13 +410,22 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 				if (errors.tx_errors != 0xFFFF) {
 					errors.tx_errors++;
 				}
+#ifdef DEBUG_PINS_RADIO_TX_RX
+        P1 &= ~0x01;
+#endif // DEBUG_PINS_RADIO_TX_RX
 				return false;
 			}
-			return true;			
+#ifdef DEBUG_PINS_RADIO_TX_RX
+      P1 &= ~0x01;
+#endif // DEBUG_PINS_RADIO_TX_RX
+			return true;
 		}
 
 	}
-
+#ifdef DEBUG_PINS_RADIO_TX_RX
+  P1 &= ~0x01;
+#endif // DEBUG_PINS_RADIO_TX_RX
+  
 	// transmit timeout ... clear the FIFO
 	debug("TX timeout %u ts=%u tn=%u len=%u\n",
 		timeout_ticks,
@@ -415,7 +439,7 @@ radio_transmit_simple(__data uint8_t length, __xdata uint8_t * __pdata buf, __pd
 	return false;
 }
 
-
+#ifdef INCLUDE_GOLAY
 // start transmitting a packet from the transmit FIFO
 //
 // @param length		number of data bytes to send
@@ -429,7 +453,7 @@ radio_transmit_golay(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint
 {
 	__pdata uint16_t crc;
 	__xdata uint8_t gin[3];
-	__data uint8_t elen, rlen;
+	__pdata uint8_t elen, rlen;
 
 	if (length > (sizeof(radio_buffer)/2)-6) {
 		debug("golay packet size %u\n", (unsigned)length);
@@ -465,6 +489,7 @@ radio_transmit_golay(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint
 
 	return radio_transmit_simple(elen, radio_buffer, timeout_ticks);
 }
+#endif // INCLUDE_GOLAY
 
 // start transmitting a packet from the transmit FIFO
 //
@@ -478,17 +503,23 @@ bool
 radio_transmit(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint16_t timeout_ticks)
 {
 	bool ret;
+
 	EX0_SAVE_DISABLE;
 
 #if defined BOARD_rfd900a || defined BOARD_rfd900p
 	PA_ENABLE = 1;		// Set PA_Enable to turn on PA prior to TX cycle
 #endif
-	
+
+#ifdef INCLUDE_GOLAY
 	if (!feature_golay) {
 		ret = radio_transmit_simple(length, buf, timeout_ticks);
 	} else {
 		ret = radio_transmit_golay(length, buf, timeout_ticks);
 	}
+#else
+  ret = radio_transmit_simple(length, buf, timeout_ticks);
+#endif // INCLUDE_GOLAY
+  
 #if defined BOARD_rfd900a || defined BOARD_rfd900p
 	PA_ENABLE = 0;		// Set PA_Enable to off the PA after TX cycle
 #endif
@@ -1074,7 +1105,7 @@ static void
 set_frequency_registers(__pdata uint32_t frequency)
 {
 	uint8_t band;
-	__pdata uint16_t carrier;
+	__xdata uint16_t carrier;
 
 	if (frequency > 480000000UL) {
 		frequency -= 480000000UL;
@@ -1107,15 +1138,28 @@ set_frequency_registers(__pdata uint32_t frequency)
 int16_t
 radio_temperature(void)
 {
-	register int16_t temp_local;
+#ifdef TEMP_OFFSET
+	register int16_t temp_local, temp_offset;
 
+  SFRPAGE	 = TOFF_PAGE;
+  temp_offset = (TOFFH << 2) | (TOFFL >> 6);
+  SFRPAGE	 = LEGACY_PAGE;
+  
 	AD0BUSY = 1;		// Start ADC conversion
 	while (AD0BUSY) ;  	// Wait for completion of conversion
 
 	temp_local = (ADC0H << 8) | ADC0L;
-	temp_local *= 1.64060;  // convert reading into mV ( (val/1024) * 1680 )  vref=1680mV
-	temp_local = 25.0 + (temp_local - 1025) / 3.4; // convert mV reading into degC.
-
+	temp_local = TEMP_OFFSET + (temp_local - temp_offset) / 2; // convert reading into degC.
+#else
+  register int16_t temp_local;
+  
+  AD0BUSY = 1;		// Start ADC conversion
+  while (AD0BUSY) ;  	// Wait for completion of conversion
+  
+  temp_local = (ADC0H << 8) | ADC0L;
+  temp_local *= 1.64060;  // convert reading into mV ( (val/1024) * 1680 )  vref=1680mV
+  temp_local = 25.0 + (temp_local - 1025) / 3.4; // convert mV reading into degC.
+#endif
 	return temp_local;
 }
 
@@ -1152,6 +1196,10 @@ INTERRUPT(Receiver_ISR, INTERRUPT_INT0)
 {
 	__data uint8_t status, status2;
 
+#ifdef DEBUG_PINS_RADIO_TX_RX
+  P1 |=  0x02;
+#endif // DEBUG_PINS_RADIO_TX_RX
+  
 	status2 = register_read(EZRADIOPRO_INTERRUPT_STATUS_2);
 	status  = register_read(EZRADIOPRO_INTERRUPT_STATUS_1);
 
@@ -1198,6 +1246,9 @@ INTERRUPT(Receiver_ISR, INTERRUPT_INT0)
 		// go into tune mode
 		register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_1, EZRADIOPRO_PLLON);
 	}
+#ifdef DEBUG_PINS_RADIO_TX_RX
+  P1 &= ~0x02;
+#endif // DEBUG_PINS_RADIO_TX_RX
 	return;
 
 rxfail:
@@ -1205,5 +1256,8 @@ rxfail:
 		errors.rx_errors++;
 	}
 	radio_receiver_on();
+#ifdef DEBUG_PINS_RADIO_TX_RX
+  P1 &= ~0x02;
+#endif // DEBUG_PINS_RADIO_TX_RX
 }
 

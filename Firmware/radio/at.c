@@ -38,13 +38,17 @@
 #include "at.h"
 #include "board.h"
 
+#ifdef CPU_SI1030
+#include "AES/aes.h"
+#endif
+
 // canary data for ram wrap. It is in at.c as the compiler
 // assigns addresses in alphabetial order and we want this at a low
 // address
 __pdata uint8_t pdata_canary = 0x41;
 
 // AT command buffer
-__pdata char at_cmd[AT_CMD_MAXLEN + 1];
+__xdata char at_cmd[AT_CMD_MAXLEN + 1];
 __pdata uint8_t	at_cmd_len;
 
 // mode flags
@@ -441,7 +445,21 @@ at_ampersand(void)
 			at_error();
 		}
 		break;
-		
+#ifdef CPU_SI1030
+  case 'E':
+    switch (at_cmd[4]) {
+      case '?':
+        print_encryption_key();
+        return;
+        
+      case '=':
+        if (param_set_encryption_key((__xdata unsigned char *)&at_cmd[5])) {
+          at_ok();
+          return;
+        }
+        break;
+    }
+#endif // CPU_SI1030
 	default:
 		at_error();
 		break;

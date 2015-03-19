@@ -42,6 +42,10 @@
 #include "timer.h"
 #include "freq_hopping.h"
 
+#ifdef CPU_SI1030
+#include "AES/aes.h"
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @name	Interrupt vector prototypes
 ///
@@ -59,13 +63,17 @@ extern void	Receiver_ISR(void)	__interrupt(INTERRUPT_INT0);
 
 /// Timer2 tick interrupt handler
 ///
-extern void    T2_ISR(void)            __interrupt(INTERRUPT_TIMER2);
+extern void    T2_ISR(void)     __interrupt(INTERRUPT_TIMER2);
 
 /// Timer3 tick interrupt handler
 ///
 /// @todo switch this and everything it calls to use another register bank?
 ///
-extern void    T3_ISR(void)            __interrupt(INTERRUPT_TIMER3);
+extern void    T3_ISR(void)     __interrupt(INTERRUPT_TIMER3);
+
+#ifdef CPU_SI1030
+extern void    DMA_ISR(void)    __interrupt(INTERRUPT_DMA0);
+#endif
 
 //@}
 
@@ -133,6 +141,13 @@ main(void)
 	pins_user_init();
 #endif
 	
+#ifdef CPU_SI1030
+	// Initialise Encryption
+	if (! aes_init(param_get(PARAM_ENCRYPTION))) {
+		panic("failed to initialise aes");
+	}
+#endif
+
 	tdm_serial_loop();
 }
 
@@ -160,7 +175,7 @@ panic(char *fmt, ...)
 static void
 hardware_init(void)
 {
-	__pdata uint16_t	i;
+	__xdata uint16_t	i;
 
 	// Disable the watchdog timer
 	PCA0MD	&= ~0x40;
@@ -244,8 +259,8 @@ hardware_init(void)
 	// global interrupt enable
 	EA = 1;
 	
-	// Turn on the 'radio running' LED and turn off the bootloader LED
-	LED_RADIO = LED_ON;
+	// Turn off the 'radio running' LED and turn off the bootloader LED
+	LED_RADIO = LED_OFF;
 	LED_BOOTLOADER = LED_OFF;
 
 	// ADC system initialise for temp sensor
@@ -269,9 +284,9 @@ hardware_init(void)
 static void
 radio_init(void)
 {
-	__pdata uint32_t freq_min, freq_max;
-	__pdata uint32_t channel_spacing;
-	__pdata uint8_t txpower;
+	__xdata uint32_t freq_min, freq_max;
+	__xdata uint32_t channel_spacing;
+	__xdata uint8_t txpower;
 
 	// Do generic PHY initialisation
 	if (!radio_initialise()) {
@@ -425,7 +440,7 @@ radio_init(void)
 #endif
 
 	// initialise frequency hopping system
-	fhop_init(param_get(PARAM_NETID));
+	fhop_init();
 
 	// initialise TDM system
 	tdm_init();

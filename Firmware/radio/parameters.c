@@ -41,10 +41,14 @@
 
 
 #include "radio.h"
+#include "pins_user.h"
 #include "tdm.h"
 #include "crc.h"
 #include <flash_layout.h>
-#include "pins_user.h"
+
+#ifdef CPU_SI1030
+#include "AES/aes.h"
+#endif
 
 /// In-ROM parameter info table.
 ///
@@ -67,7 +71,8 @@ __code const struct parameter_info {
 	{"LBT_RSSI",        0},
 	{"MANCHESTER",      0},
 	{"RTSCTS",          0},
-	{"MAX_WINDOW",    131},
+  {"MAX_WINDOW",    131},
+  {"ENCRYPTION_LEVEL", 0},
 };
 
 /// In-RAM parameter store.
@@ -79,19 +84,40 @@ __code const struct parameter_info {
 __xdata param_t	parameter_values[PARAM_MAX];
 
 // Three extra bytes, 1 for the number of params and 2 for the checksum
-#define PARAM_FLASH_START		1
-#define PARAM_FLASH_END			(PARAM_FLASH_START + sizeof(parameter_values) + 2)
+#define PARAM_FLASH_START   0
+#define PARAM_FLASH_END     (PARAM_FLASH_START + sizeof(parameter_values) + 3)
 
 #if PIN_MAX > 0
 __code const pins_user_info_t pins_defaults = PINS_USER_INFO_DEFAULT;
 __xdata pins_user_info_t pin_values[PIN_MAX];
 
-// Place the start away from the other params to allow for expantion 2<<6 = 128
-#define PIN_FLASH_START (2<<6)
-#define PIN_FLASH_END		(PIN_FLASH_START + sizeof(pin_values) + 2)
-#endif
+// Place the start away from the other params to allow for expantion 2<<7 = 256
+#define PIN_FLASH_START       (2<<7)
+#define PIN_FLASH_END         (PIN_FLASH_START + sizeof(pin_values) + 3)
+
+// Check to make sure the End of the r and the beginning of pins dont overlap
+typedef char r2pCheck[(PARAM_FLASH_END < PIN_FLASH_START) ? 0 : -1];
+#else // PIN_MAX
+#define PIN_FLASH_END PARAM_FLASH_END
+#endif // PIN_MAX
+
+// Place the start away from the other params to allow for expantion 2<<7 +128 = 384
+#ifdef CPU_SI1030
+// Holds the encrpytion string
+__xdata uint8_t encryption_key[32];
+
+#define PARAM_E_FLASH_START   (2<<7) + 128
+#define PARAM_E_FLASH_END     (PARAM_E_FLASH_START + sizeof(encryption_key) + 3)
+
+// Check to make sure the End of the pins and the beginning of encryption dont overlap
+typedef char p2eCheck[(PIN_FLASH_END < PARAM_E_FLASH_START) ? 0 : -1];
+#else
+#define PARAM_E_FLASH_END PIN_FLASH_END
+#endif // CPU_SI1030
 
 
+// Check to make sure we dont overflow off the page
+typedef char endCheck[(PARAM_E_FLASH_END < 1023) ? 0 : -1];
 
 static bool
 param_check(__pdata enum ParamID id, __data uint32_t val)
@@ -247,12 +273,12 @@ __critical {
 	param_default();
 	
 	// loop reading the parameters array
-	expected = flash_read_scratch(0);
+	expected = flash_read_scratch(PARAM_FLASH_START);
 	if (expected > sizeof(parameter_values) || expected < 12*sizeof(param_t))
 		return false;
 	
 	// read and verify params
-	if(!read_params((__xdata uint8_t *)parameter_values, PARAM_FLASH_START, expected))
+	if(!read_params((__xdata uint8_t *)parameter_values, PARAM_FLASH_START+1, expected))
 		return false;
 	
 	// decide whether we read a supported version of the structure
@@ -269,8 +295,14 @@ __critical {
 	
 	// read and verify pin params
 #if PIN_MAX > 0
-	if(!read_params((__xdata uint8_t *)pin_values, PIN_FLASH_START, sizeof(pin_values)))
+	if(!read_params((__xdata uint8_t *)pin_values, PIN_FLASH_START+1, sizeof(pin_values)))
 		return false;
+#endif
+  
+  // read and verify encryption params
+#ifdef CPU_SI1030
+  if(!read_params((__xdata uint8_t *)encryption_key, PARAM_E_FLASH_START+1, sizeof(encryption_key)))
+    return false;
 #endif
 
 	return true;
@@ -287,14 +319,21 @@ __critical {
 	flash_erase_scratch();
 
 	// write param array length
-	flash_write_scratch(0, sizeof(parameter_values));
+	flash_write_scratch(PARAM_FLASH_START, sizeof(parameter_values));
 
 	// write params
-	write_params((__xdata uint8_t *)parameter_values, PARAM_FLASH_START, sizeof(parameter_values));
+	write_params((__xdata uint8_t *)parameter_values, PARAM_FLASH_START+1, sizeof(parameter_values));
 
 	// write pin params
 #if PIN_MAX > 0
-	write_params((__xdata uint8_t *)pin_values, PIN_FLASH_START, sizeof(pin_values));
+  flash_write_scratch(PIN_FLASH_START, sizeof(pin_values));
+	write_params((__xdata uint8_t *)pin_values, PIN_FLASH_START+1, sizeof(pin_values));
+#endif
+  
+  // write encryption params
+#ifdef CPU_SI1030
+  flash_write_scratch(PARAM_E_FLASH_START, sizeof(encryption_key));
+  write_params((__xdata uint8_t *)encryption_key, PARAM_E_FLASH_START+1, sizeof(encryption_key));
 #endif
 }
 
@@ -372,6 +411,10 @@ flash_read_byte(uint16_t address) __reentrant
 bool
 calibration_set(uint8_t idx, uint8_t value) __reentrant
 {
+#ifdef CPU_SI1030
+  PSBANK = 0x33;
+#endif
+  
 	// if level is valid
 	if (idx <= BOARD_MAXTXPOWER && value != 0xFF)
 	{
@@ -410,6 +453,10 @@ calibration_lock() __reentrant
 	uint8_t idx;
 	uint8_t crc = 0;
 
+#ifdef CPU_SI1030
+  PSBANK = 0x33;
+#endif
+  
 	// check that all entries are written
 	if (flash_read_byte(FLASH_CALIBRATION_CRC_HIGH) == 0xFF)
 	{
@@ -434,3 +481,111 @@ calibration_lock() __reentrant
 	return false;
 }
 #endif
+
+#ifdef CPU_SI1030
+// Used to convert individial Hex digits into Integers
+//
+uint8_t read_hex_nibble(const uint8_t c) __reentrant
+{
+  if ((c >='0') && (c <= '9'))
+  {
+    return c - '0';
+  }
+  else if ((c >='A') && (c <= 'F'))
+  {
+    return c - 'A' + 10;
+  }
+  else if ((c >='a') && (c <= 'f'))
+  {
+    return c - 'a' + 10;
+  }
+  else
+  {
+    // printf("[%u] read_hex_nibble: Error char not in supported range",nodeId);
+    return 0;
+  }
+}
+
+
+/// Convert string to hex codes
+///
+void convert_to_hex(__xdata unsigned char *str_in, __xdata unsigned char *str_out,	__pdata uint8_t key_length)
+{
+  __pdata uint8_t i, num;
+  
+  for (i=0;i<key_length;i++) {
+    num = read_hex_nibble(str_in[2 * i])<<4;
+    num += read_hex_nibble(str_in[2 * i + 1]);
+    str_out[i] = num;
+  }
+}
+
+/// Set default encryption key
+//
+void param_set_default_encryption_key(__pdata uint8_t key_length)
+{
+  __pdata uint8_t i;
+  __xdata uint8_t b[] = {0x62};
+  
+  for (i=0;i< key_length;i++) {
+    // Set default key to b's
+    memcpy(&encryption_key[i], &b, 1);
+  }
+}
+
+/// set the encryption key
+///
+/// Note: There is a reliance on the encryption level as this determines
+///       how many characters we need. So we need to set ATS16 first, THEN
+///       save and then Set the encryption key.
+///
+bool
+param_set_encryption_key(__xdata unsigned char *key)
+{
+  __pdata uint8_t len, key_length;
+  
+  // Use the new encryption level to help with key changes before reboot
+  // Deduce key length (bytes) from level 1 -> 16, 2 -> 24, 3 -> 32
+  key_length = AES_KEY_LENGTH(param_get(PARAM_ENCRYPTION));
+  len = strlen(key);
+  // If not enough characters (2 char per byte), then set default
+  if (len < 2 * key_length ) {
+    param_set_default_encryption_key(key_length);
+    //printf("%s\n",key);
+    printf("ERROR - Key length:%u, Required %u\n",len, 2 * key_length);
+    return true;
+  } else {
+    // We have sufficient characters for the encryption key.
+    // If too many characters, then it will just ignore extra ones
+    printf("key len %d\n",key_length);
+    convert_to_hex(key, encryption_key, key_length);
+  }
+  
+  return true;
+}
+
+/// Print hex codes for given string
+///
+void
+print_encryption_key()
+{
+  __pdata uint8_t i;
+  __pdata uint8_t key_length = AES_KEY_LENGTH(param_get(PARAM_ENCRYPTION));
+  
+  for (i=0; i<key_length; i++) {
+    if (0xF >= encryption_key[i]) {
+      printf("0");
+    }
+    printf("%x",encryption_key[i]);
+  }
+  printf("\n");
+}
+
+/// get the encryption key
+///
+__xdata uint8_t* param_get_encryption_key()
+{
+  return encryption_key;
+}
+#endif // CPU_SI1030
+

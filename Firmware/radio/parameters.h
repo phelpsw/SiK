@@ -62,6 +62,7 @@ enum ParamID {
 	PARAM_MANCHESTER,		// enable manchester encoding
 	PARAM_RTSCTS,			// enable hardware flow control
 	PARAM_MAX_WINDOW,		// The maximum window size allowed
+  PARAM_ENCRYPTION,
 	PARAM_MAX				// must be last
 };
 
@@ -131,3 +132,17 @@ extern bool calibration_set(uint8_t idx, uint8_t value) __reentrant;
 extern uint8_t calibration_get(uint8_t level) __reentrant;
 extern bool calibration_lock() __reentrant;
 #endif // BOARD_rfd900a || BOARD_rfd900p
+
+#ifdef CPU_SI1030
+/// get the encryption key
+///
+extern __xdata uint8_t *param_get_encryption_key();
+
+/// set the encryption key
+///
+extern bool param_set_encryption_key(__xdata unsigned char *key);
+
+/// Print hex codes
+///
+extern void print_encryption_key();
+#endif // CPU_SI1030
