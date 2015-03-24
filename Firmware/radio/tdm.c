@@ -607,9 +607,11 @@ tdm_serial_loop(void)
 		}
 
 #ifdef CPU_SI1030
+    // Ensure we arn't needing to hop
     // If we have any packets that need decrypting lets do it now.
-    if(decryptPackets())
+    if(tdm_state_remaining > tx_window_width/2)
     {
+      decryptPackets();
       continue;
     }
 #endif
