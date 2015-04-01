@@ -33,7 +33,7 @@
 ///
 
 #include "pins_user.h"
-#include "radio.h"
+#include "tdm.h"
 
 #if PIN_MAX > 0
 
@@ -55,6 +55,14 @@ __code const struct pins_user_map {
 	{1, 0}, // 0 - P1.0
 	{1, 1}, // 1 - P1.1
 };
+#elif defined BOARD_rfd900p
+	{3, 4}, // 0 - P3.4
+	{3, 3}, // 1 - P3.3
+	{1, 2}, // 2 - P1.2
+	{1, 3}, // 3 - P1.3
+	{1, 1}, // 4 - P1.1
+	{1, 0}, // 5 - P1.0
+};
 #else
 	{0xff, 0xff} // Default pin mapping (not supported)
 };
@@ -71,6 +79,9 @@ pins_user_init(void)
 		pins_user_set_io(i, pin_values[i].output);
 		pins_user_set_value(i, pin_values[i].pin_dir);
 	}
+	
+// Client Application Hack
+//	pins_user_set_value(3,PIN_HIGH);
 }
 
 bool
@@ -83,7 +94,6 @@ pins_user_set_io(__pdata uint8_t pin, bool in_out)
 		
 		// Esure we are on the Legacy page (SFR Page 0x0)
 		SFRPAGE	= LEGACY_PAGE;
-		//P0DRV
 		
 		switch(pins_user_map[pin].port)
 		{
@@ -122,8 +132,21 @@ pins_user_set_io(__pdata uint8_t pin, bool in_out)
 				else
 					P2DRV &= ~(1<<pins_user_map[pin].pin);
 				break;
-				
+#ifdef CPU_SI1030
+      case 3:
+        if(in_out)
+          P3MDOUT |= (1<<pins_user_map[pin].pin);
+        else
+          P3MDOUT &= ~(1<<pins_user_map[pin].pin);
+        SFRPAGE	= CONFIG_PAGE;
+        if(in_out)
+          P3DRV |= (1<<pins_user_map[pin].pin);
+        else
+          P3DRV &= ~(1<<pins_user_map[pin].pin);
+        break;
+#endif // CPU_SI1030
 			default:
+				SFRPAGE	= LEGACY_PAGE;
 				return false;
 		}
 		SFRPAGE	= LEGACY_PAGE;
@@ -179,7 +202,18 @@ pins_user_set_value(__pdata uint8_t pin, bool high_low)
 					P2 &= ~(1<<pins_user_map[pin].pin);
 				}
 				break;
-				
+#ifdef CPU_SI1030
+      case 3:
+        if(high_low)
+        {
+          P3 |= (1<<pins_user_map[pin].pin);
+        }
+        else
+        {
+          P3 &= ~(1<<pins_user_map[pin].pin);
+        }
+        break;
+#endif // CPU_SI1030
 			default:
 				return false;
 		}
@@ -203,21 +237,43 @@ pins_user_get_adc(__pdata uint8_t pin)
 		{
 			case 0:
 				return P0 & (1<<pins_user_map[pin].pin);
-				break;
-				
 			case 1:
 				return P1 & (1<<pins_user_map[pin].pin);
-				break;
-				
 			case 2:
 				return P2 & (1<<pins_user_map[pin].pin);
-				break;
-				
-			default:
+#ifdef CPU_SI1030
+      case 3:
+        return P3 & (1<<pins_user_map[pin].pin);
+#endif // CPU_SI1030
+      default:
 				return PIN_ERROR;
 		}
 	}
 	return PIN_ERROR;
 }
 
-#endif // #if PIN_MAX > 0
+void
+pins_user_check()
+{
+//	static uint8_t p, p_count;
+//	if (pins_user_get_adc(5) != p || p_count != 0) {
+//		if(pins_user_get_adc(5) != p)
+//		{
+//			p = pins_user_get_adc(5);
+//			p_count = 100;
+//		}
+//		at_cmd[0] = 'R';
+//		at_cmd[1] = 'T';
+//		at_cmd[2] = 'P';
+//		at_cmd[3] = 'C';
+//		at_cmd[4] = '=';
+//		at_cmd[5] = '4';
+//		at_cmd[6] = ',';
+//		at_cmd[7] = '0'+(p?1:0);
+//		at_cmd[8] = 0;
+//		tdm_remote_at();
+//		p_count --;
+//	}
+}
+
+#endif // PIN_MAX > 0

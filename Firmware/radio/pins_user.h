@@ -37,9 +37,12 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "radio.h"
 
 // Pin rfd900a  Mapping
 #ifdef BOARD_rfd900a
+#define PINS_USER_MAX 6
+#elif defined BOARD_rfd900p
 #define PINS_USER_MAX 6
 #elif defined BOARD_rfd900u
 #define PINS_USER_MAX 2
@@ -68,12 +71,15 @@ typedef struct pins_user_info {
 #define PINS_USER_INFO_DEFAULT {PIN_MIRROR_NULL, PIN_OUTPUT, PIN_LOW, PIN_NULL}
 
 #if PIN_MAX > 0
+extern pins_user_info_t pin_values[];
+
 extern void pins_user_init(void);
 extern bool pins_user_set_io(__pdata uint8_t pin, bool in_out);
 extern bool pins_user_get_io(__pdata uint8_t pin);
 extern bool pins_user_set_value(__pdata uint8_t pin, bool high_low);
 extern bool pins_user_get_value(__pdata uint8_t pin);
 extern uint8_t pins_user_get_adc(__pdata uint8_t pin);
+extern void pins_user_check();
 #endif // #if PIN_MAX > 0
 
 #endif	// _PINS_H_

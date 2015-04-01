@@ -60,8 +60,13 @@ SBIT (TDM_SYNC_PIN, SFR_P2, 2);
 #endif // TDM_SYNC_LOGIC
 
 #ifdef TDM_ACTIVITY_LOGIC
+#ifdef CPU_CC1030
+SBIT (TDM_ACTIVITY_PIN, SFR_P3, 3);
+SBIT (TDM_SYNC_PIN, SFR_P1, 2);
+#else
 SBIT (TDM_ACTIVITY_PIN, SFR_P2, 2);
 SBIT (TDM_SYNC_PIN, SFR_P2, 1);
+#endif
 #define ACTIVITY_LED(logic) TDM_ACTIVITY_PIN = logic; LED_ACTIVITY = logic;
 #define RADIO_LED(logic)    TDM_SYNC_PIN = logic;     LED_RADIO = logic;
 #else
