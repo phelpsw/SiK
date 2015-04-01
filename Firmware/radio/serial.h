@@ -67,7 +67,9 @@ extern bool	serial_write(register uint8_t c);
 /// @param	count		The number of bytes to write.
 ///
 extern void	serial_write_buf(__xdata uint8_t * buf, __pdata uint8_t count);
+#ifdef INCLUDE_AES
 extern void serial_decrypt_buf(__xdata uint8_t * buf, __pdata uint8_t count);
+#endif
 
 /// Decrypt any packets in the buffer and push to the serial layer
 ///

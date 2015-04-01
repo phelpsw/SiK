@@ -42,7 +42,7 @@
 #include "freq_hopping.h"
 #include "crc.h"
 
-#ifdef CPU_SI1030
+#ifdef INCLUDE_AES
 #include "AES/aes.h"
 #endif
 
@@ -580,7 +580,7 @@ tdm_serial_loop(void)
 					// the serial port
 					//printf("rcv(%d,[", len);
 					LED_ACTIVITY = LED_ON;
-#ifdef CPU_SI1030
+#ifdef INCLUDE_AES
           serial_decrypt_buf(pbuf, len);
 #else
           serial_write_buf(pbuf, len);
@@ -606,7 +606,7 @@ tdm_serial_loop(void)
 			last_link_update = tnow;
 		}
 
-#ifdef CPU_SI1030
+#ifdef INCLUDE_AES
     // Ensure we arn't needing to hop
     // If we have any packets that need decrypting lets do it now.
     if(tdm_state_remaining > tx_window_width/2)

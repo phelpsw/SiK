@@ -261,7 +261,7 @@ _serial_write(register uint8_t c) __reentrant
 	ES0_RESTORE;
 }
 
-#ifdef CPU_SI1030
+#ifdef INCLUDE_AES
 // If on appropriate CPU and encryption configured, then attempt to decrypt it
 bool
 decryptPackets(void)
@@ -325,7 +325,7 @@ serial_decrypt_buf(__xdata uint8_t * buf, __pdata uint8_t count)
     serial_write_buf(buf, count);
   }
 }
-#endif // CPU_SI1030
+#endif // INCLUDE_AES
 
 // write as many bytes as will fit into the serial transmit buffer
 // if encryption turned on, decrypt the packet.
