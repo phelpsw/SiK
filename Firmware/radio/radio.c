@@ -449,7 +449,7 @@ radio_initialise(void)
 		// already ready
 		return true;
 	}
-	
+  
 	return false;
 }
 
@@ -619,11 +619,11 @@ radio_configure(__pdata uint8_t air_rate)
 #elif ENABLE_RFD900_SWITCH
 	register_write(EZRADIOPRO_GPIO0_CONFIGURATION, 0x15);	// RX data (output)
 	register_write(EZRADIOPRO_GPIO1_CONFIGURATION, 0x12);	// RX data (output)
-#if RFD900_DIVERSITY
-	radio_set_diversity(true);
-#else
+//#if RFD900_DIVERSITY
+//	radio_set_diversity(true);
+//#else
 	radio_set_diversity(false);
-#endif
+//#endif
 #else
 	//set GPIOx to GND
 	register_write(EZRADIOPRO_GPIO0_CONFIGURATION, 0x14);	// RX data (output)
@@ -1058,15 +1058,14 @@ radio_temperature(void)
 
 /// Turn off radio diversity
 ///
-#define DIV_MODE 0x01 // 0x80
 void
 radio_set_diversity(bool enable)
 {
-  if (enable)
+	if (enable)
 	{
 		register_write(EZRADIOPRO_GPIO2_CONFIGURATION, 0x18);
 		// see table 23.8, page 279
-		register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2, (register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2) & ~EZRADIOPRO_ANTDIV_MASK) | DIV_MODE);
+		register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2, (register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2) & ~EZRADIOPRO_ANTDIV_MASK) | 0x80);
 	}
 	else
 	{
