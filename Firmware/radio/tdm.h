@@ -37,6 +37,7 @@
 #define _TDM_H_
 
 #include <stdbool.h>
+#include "board.h"
 
 // Debug pins
 //#define DEBUG_PINS_YIELD // P2.6

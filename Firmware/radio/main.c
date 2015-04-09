@@ -275,7 +275,7 @@ hardware_init(void) __nonbanked
 //#endif
 	
 	// Turn on the 'radio running' LED and turn off the bootloader LED
-	LED_RADIO = LED_ON;
+	RADIO_LED(LED_ON);
 	LED_BOOTLOADER = LED_OFF;
 	
 	// ADC system initialise for temp sensor
