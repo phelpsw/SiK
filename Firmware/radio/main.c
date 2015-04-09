@@ -270,7 +270,7 @@ hardware_init(void)
 	ADC0MX = 0x1B;	// Set ADC0MX to temp sensor
 	REF0CN = 0x07;	// Define reference and enable temp sensor
 
-#ifdef BOARD_rfd900a
+#if defined BOARD_rfd900a || defined BOARD_rfd900p
 	// PCA0, CEX0 setup and enable.
 	PCA0MD = 0x88;
 	PCA0PWM = 0x00;

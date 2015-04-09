@@ -573,6 +573,15 @@ at_plus(void)
 			return;
 		}
 		break;
+  case 'F': // AT+Fx? get calibration value
+    switch (at_cmd[idx])
+    {
+    case '?':
+      at_num = calibration_force_get(at_num);
+      printf("%lu\n",at_num);
+      return;
+    }
+    break;
 	case 'L': // AT+L lock bootloader area if all calibrations written
 		if (calibration_lock())
 		{

@@ -447,6 +447,12 @@ calibration_get(uint8_t level) __reentrant
 	return 0xFF;
 }
 
+uint8_t
+calibration_force_get(uint8_t level) __reentrant
+{
+  return flash_read_byte(FLASH_CALIBRATION_AREA_HIGH + level); //calibration[level];
+}
+
 bool
 calibration_lock() __reentrant
 {
