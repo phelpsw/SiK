@@ -39,9 +39,7 @@
 #include <stdbool.h>
 
 // Pin rfd900a  Mapping
-#ifdef BOARD_rfd900a
-#define PINS_USER_MAX 6
-#elif defined BOARD_rfd900p
+#if defined BOARD_rfd900a || defined BOARD_rfd900p
 #define PINS_USER_MAX 6
 #elif defined BOARD_rfd900u
 #define PINS_USER_MAX 2
@@ -49,8 +47,13 @@
 #define PINS_USER_MAX 0
 #endif
 
-#define PINS_ABS_MAX 10 // The packet can only support 4 pins
+#define PINS_ABS_MAX 10
+
+#ifdef INCLUDE_AES
+#define PIN_MAX 0
+#else
 #define PIN_MAX (PINS_USER_MAX < PINS_ABS_MAX ? PINS_USER_MAX : PINS_ABS_MAX)
+#endif // CPU_SI1030
 
 enum pin_state { PIN_OUTPUT=true, PIN_INPUT=false,
 				 PIN_HIGH=true,   PIN_LOW=false,
@@ -78,6 +81,7 @@ struct pinState_packet {
 extern bool at_mode;
 extern bool sendUpdateNow;
 extern __pdata struct pinState_packet pinStatePacket;
+extern pins_user_info_t pin_values[];
 
 extern void pins_user_init(void);
 extern bool pins_user_set_io(__pdata uint8_t pin, bool in_out);

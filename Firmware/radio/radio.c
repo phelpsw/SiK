@@ -33,6 +33,7 @@
 #include "radio.h"
 #include "timer.h"
 #include "crc.h"
+#include "pins_user.h"
 
 __xdata uint8_t radio_buffer[MAX_PACKET_LENGTH];
 __pdata uint8_t receive_packet_length;
@@ -381,9 +382,11 @@ radio_transmit(uint8_t length, __xdata uint8_t * __pdata buf, __pdata uint16_t t
 	PA_ENABLE = 1;		// Set PA_Enable to turn on PA prior to TX cycle
 #endif
   ret = radio_transmit_simple(length, buf, timeout_ticks);
-#if defined BOARD_rfd900a || defined BOARD_rfd900p
-	PA_ENABLE = 0;		// Set PA_Enable to off the PA after TX cycle
-#endif
+  
+// We arn't going to turn off the amp! We must now not transmitt at full power
+//#if defined BOARD_rfd900a || defined BOARD_rfd900p
+//	PA_ENABLE = 0;		// Set PA_Enable to off the PA after TX cycle
+//#endif
 	EX0_RESTORE;
 	return ret;
 }
@@ -619,11 +622,7 @@ radio_configure(__pdata uint8_t air_rate)
 #elif ENABLE_RFD900_SWITCH
 	register_write(EZRADIOPRO_GPIO0_CONFIGURATION, 0x15);	// RX data (output)
 	register_write(EZRADIOPRO_GPIO1_CONFIGURATION, 0x12);	// RX data (output)
-//#if RFD900_DIVERSITY
-//	radio_set_diversity(true);
-//#else
-	radio_set_diversity(false);
-//#endif
+	radio_set_diversity(DIVERSITY_DISABLED);
 #else
 	//set GPIOx to GND
 	register_write(EZRADIOPRO_GPIO0_CONFIGURATION, 0x14);	// RX data (output)
@@ -682,7 +681,7 @@ radio_configure(__pdata uint8_t air_rate)
 	} else {
 		control = 0x2D;
 	}
-	if (param_s_get(PARAM_MANCHESTER) && settings.air_data_rate <= 128) {
+	if (param_get(PARAM_MANCHESTER) && settings.air_data_rate <= 128) {
 		// manchester encoding is not possible at above 128kbps
 		control |= EZRADIOPRO_ENMANCH;
 	}
@@ -774,67 +773,6 @@ radio_set_transmit_power(uint8_t power)
 	settings.transmit_power = power_levels[i];
 	register_write(EZRADIOPRO_TX_POWER, i);
 #endif
-}
-
-// Set the power to the next level and return the new transmit power (in dBm)
-// increment, increment or decrement the power level
-// maxPower,  never go above this level when changing the power
-//
-uint8_t
-radio_change_transmit_power(bool increment, uint8_t maxPower)
-{
-	uint8_t i, power = settings.transmit_power;
-	
-#if defined BOARD_rfd900a || defined BOARD_rfd900p
-	register_write(EZRADIOPRO_TX_POWER, RFD900_INT_TX_POW); // Set output power of Si1002 to 6 = +10dBm as a nominal level
-	
-	if (increment) {
-		power += 2;
-		if(power > maxPower) {
-			return settings.transmit_power;
-		}
-	}
-	else if(power != 0)
-	{
-		power -= 2;
-	}
-	
-	i = calibration_get(power);
-	if (i != 0xFF)
-	{
-		PCA0CPH0 = i;     // Set PWM for PA to correct duty cycle
-		settings.transmit_power = power;
-	}
-	else
-	{
-		i = power / POWER_LEVEL_STEP;
-		PCA0CPH0 = power_levels[i];     // Set PWM for PA to correct duty cycle
-		settings.transmit_power = i * POWER_LEVEL_STEP;
-	}
-#else
-	for (i=0; i<NUM_POWER_LEVELS; i++) {
-		if (power <= power_levels[i]) break;
-	}
-	
-	if (increment) {
-		i++;
-	}
-	else if(i != 0)
-	{
-		i--;
-	}
-	
-	if (i >= NUM_POWER_LEVELS) {
-		i = NUM_POWER_LEVELS-1;
-	}
-	
-	if (maxPower <= power_levels[i]) {
-		settings.transmit_power = power_levels[i];
-		register_write(EZRADIOPRO_TX_POWER, i);
-	}
-#endif
-	
-	return settings.transmit_power;
 }
 
 // get the current transmit power (in dBm)
@@ -1044,37 +982,62 @@ set_frequency_registers(__pdata uint32_t frequency)
 int16_t
 radio_temperature(void)
 {
-	register int16_t temp_local;
+#ifdef TEMP_OFFSET
+	register int16_t temp_local, temp_offset;
 
+  SFRPAGE	 = TOFF_PAGE;
+  temp_offset = (TOFFH << 2) | (TOFFL >> 6);
+  SFRPAGE	 = LEGACY_PAGE;
+  
 	AD0BUSY = 1;		// Start ADC conversion
 	while (AD0BUSY) ;  	// Wait for completion of conversion
 
 	temp_local = (ADC0H << 8) | ADC0L;
-	temp_local *= 1.64060;  // convert reading into mV ( (val/1024) * 1680 )  vref=1680mV
-	temp_local = 25.0 + (temp_local - 1025) / 3.4; // convert mV reading into degC.
-
+	temp_local = TEMP_OFFSET + (temp_local - temp_offset) / 2; // convert reading into degC.
+#else
+  register int16_t temp_local;
+  
+  AD0BUSY = 1;		// Start ADC conversion
+  while (AD0BUSY) ;  	// Wait for completion of conversion
+  
+  temp_local = (ADC0H << 8) | ADC0L;
+  temp_local *= 1.64060;  // convert reading into mV ( (val/1024) * 1680 )  vref=1680mV
+  temp_local = 25.0 + (temp_local - 1025) / 3.4; // convert mV reading into degC.
+#endif
 	return temp_local;
 }
 
 /// Turn off radio diversity
 ///
 void
-radio_set_diversity(bool enable)
+radio_set_diversity(enum DIVERSITY_Enum state)
 {
-	if (enable)
-	{
-		register_write(EZRADIOPRO_GPIO2_CONFIGURATION, 0x18);
-		// see table 23.8, page 279
-		register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2, (register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2) & ~EZRADIOPRO_ANTDIV_MASK) | 0x80);
-	}
-	else
-	{
-		// see table 23.8, page 279
-		register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2, (register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2) & ~EZRADIOPRO_ANTDIV_MASK));
-
-		register_write(EZRADIOPRO_GPIO2_CONFIGURATION, 0x0A);	// GPIO2 (ANT1) output set high fixed
-		register_write(EZRADIOPRO_IO_PORT_CONFIGURATION, 0x04);	// GPIO2 output set high (fixed on ant 1)
-	}
+  switch (state) {
+  }
+//    case DIVERSITY_ENABLED:
+//      register_write(EZRADIOPRO_GPIO2_CONFIGURATION, 0x18);
+//      // see table 23.8, page 279
+//      register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2, (register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2) & ~EZRADIOPRO_ANTDIV_MASK) | 0x80);
+//      break;
+//      
+//    case DIVERSITY_ANT2:
+//      // see table 23.8, page 279
+//      register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2, (register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2) & ~EZRADIOPRO_ANTDIV_MASK) | 0x20);
+//      
+//      register_write(EZRADIOPRO_GPIO2_CONFIGURATION, 0x0A);	// GPIO2 output set high fixed
+//      register_write(EZRADIOPRO_IO_PORT_CONFIGURATION, 0x00);	// GPIO2 output set low (fixed on ant 2)
+//      break;
+//      
+//    case DIVERSITY_DISABLED:
+//    case DIVERSITY_ANT1:
+//    default:
+      // see table 23.8, page 279
+      register_write(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2, (register_read(EZRADIOPRO_OPERATING_AND_FUNCTION_CONTROL_2) & ~EZRADIOPRO_ANTDIV_MASK));
+      
+      register_write(EZRADIOPRO_GPIO2_CONFIGURATION, 0x0A);	// GPIO2 output set high fixed
+      register_write(EZRADIOPRO_IO_PORT_CONFIGURATION, 0x04);	// GPIO2 output set high (fixed on ant 1)
+//      break;
+//  }
 }
 
 /// the receiver interrupt

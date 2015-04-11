@@ -213,6 +213,33 @@ __at(0xFF) uint8_t __idata _canary;
 void
 tdm_serial_loop(void)
 {
+#ifdef RADIO_SPLAT_TESTING_MODE
+  for (;;) {
+    //radio_set_channel(0);
+
+    //while (radio_transmit_in_progress()) {}
+    radio_transmit(MAX_PACKET_LENGTH, pbuf, 0);
+    //radio_receiver_on();
+    
+#if PIN_MAX > 0
+    // Check to see if any pins have changed state
+    pins_user_check();
+#endif
+    
+    if(at_mode)
+    {
+      at_mode_active = 1;
+      // give the AT command processor a chance to handle a command
+      at_command();
+    }
+    else
+    {
+      LED_ACTIVITY = LED_ON;
+      at_mode_active = 0;
+    }
+  }
+#else
+  
 	__pdata uint16_t last_t = timer2_tick();
 	__pdata uint16_t last_link_update = last_t;
 
@@ -298,6 +325,7 @@ tdm_serial_loop(void)
       sendUpdateNow = false;
     }
 	}
+#endif // RADIO_SPLAT_TESTING_MODE
 }
 
 

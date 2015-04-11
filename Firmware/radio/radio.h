@@ -54,8 +54,6 @@
 // encoding this needs to be a multiple of 6
 #define MAX_PACKET_LENGTH 252
 
-// Turn on TX/RX Debug pins
-//#define DEBUG_PINS_RADIO_TX_RX // TX P1.0 - RX P1.1
 
 #include "board.h"
 #include "serial.h"
@@ -254,15 +252,6 @@ extern uint8_t radio_air_rate(void);
 ///
 extern void radio_set_transmit_power(uint8_t power);
 
-/// set the radio transmit power (in dBm)
-///
-/// @param increment	change the radio power up (true) or down (false)
-/// @param maxPower		The maximum transmit power in dBm
-/// @return						The actual transmit power in dBm
-///
-///
-extern uint8_t radio_change_transmit_power(bool increment, uint8_t maxPower);
-
 /// get the currend transmit power (in dBm)
 ///
 /// @return			The actual transmit power in dBm
@@ -304,6 +293,17 @@ extern int16_t radio_temperature(void);
 #define MAX_PA_TEMPERATURE 100
 #endif
 
-extern void radio_set_diversity(bool enable);
+//-----------------------------------------------------------------------------
+// enum used for KEY_SIZE
+//-----------------------------------------------------------------------------
+enum DIVERSITY_Enum
+{
+  DIVERSITY_ENABLED = 0,          // 0x00
+  DIVERSITY_DISABLED,             // 0x01
+  DIVERSITY_ANT1,                 // 0x02
+  DIVERSITY_ANT2                  // 0x03
+};
+
+extern void radio_set_diversity(enum DIVERSITY_Enum state);
 
 #endif // _RADIO_H_

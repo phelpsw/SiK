@@ -45,7 +45,7 @@
 ///   parameters.c:parameter_names[]
 ///   parameters.c:param_check()
 ///
-enum Param_S_ID {
+enum ParamID {
 	PARAM_FORMAT = 0,       // Must always be parameter 0
 	PARAM_SERIAL_SPEED,     // BAUD_RATE_* constant
 	PARAM_AIR_SPEED,        // over the air baud rate
@@ -61,20 +61,18 @@ enum Param_S_ID {
 	PARAM_LBT_RSSI,         // listen before talk threshold
 	PARAM_MANCHESTER,       // enable manchester encoding
 	PARAM_RTSCTS,           // enable hardware flow control
-	PARAM_YY,               // The maximum window size allowed
-	PARAM_S_MAX             // must be last
+	PARAM_YY,
+  PARAM_ZZ,
+	PARAM_MAX               // must be last
 };
 
-#define PARAM_FORMAT_CURRENT  0x0FUL  //< current parameter format ID
+#define PARAM_FORMAT_CURRENT	0x1aUL				///< current parameter format ID
 
 /// Parameter type.
 ///
 /// All parameters have this type.
 ///
 typedef uint32_t	param_t;
-#if PIN_MAX > 0
-extern pins_user_info_t pin_values[];
-#endif
 
 /// Set a parameter
 ///
@@ -84,7 +82,7 @@ extern pins_user_info_t pin_values[];
 /// @param	value		The value to assign to the parameter.
 /// @return			True if the parameter's value is valid.
 ///
-extern bool param_s_set(__data enum Param_S_ID param, __pdata param_t value);
+extern bool param_set(__data enum ParamID param, __pdata param_t value);
 
 /// Get a parameter
 ///
@@ -92,7 +90,7 @@ extern bool param_s_set(__data enum Param_S_ID param, __pdata param_t value);
 /// @return			The parameter value, or zero if the param
 ///				argument is invalid.
 ///
-extern param_t param_s_get(__data enum Param_S_ID param);
+extern param_t param_get(__data enum ParamID param);
 
 /// Look up a parameter by name
 ///
@@ -100,7 +98,7 @@ extern param_t param_s_get(__data enum Param_S_ID param);
 /// @return			The parameter ID, or PARAM_MAX if the
 ///				parameter is not known.
 ///
-extern enum ParamID param_s_id(__data char * __pdata name);
+extern enum ParamID param_id(__data char * __pdata name);
 
 /// Return the name of a parameter.
 ///
@@ -108,7 +106,7 @@ extern enum ParamID param_s_id(__data char * __pdata name);
 /// @return			A pointer to the name of the parameter,
 ///				or NULL if the parameter is not known.
 ///
-extern const char *__code param_s_name(__data enum ParamID param);
+extern const char *__code param_name(__data enum ParamID param);
 
 /// Load parameters from the flash scratchpad.
 ///
@@ -132,5 +130,20 @@ uint32_t constrain(__pdata uint32_t v, __pdata uint32_t min, __pdata uint32_t ma
 #if defined BOARD_rfd900a || defined BOARD_rfd900p
 extern bool calibration_set(uint8_t idx, uint8_t value) __reentrant;
 extern uint8_t calibration_get(uint8_t level) __reentrant;
+extern uint8_t calibration_force_get(uint8_t level) __reentrant;
 extern bool calibration_lock() __reentrant;
 #endif // BOARD_rfd900a
+
+#ifdef INCLUDE_AES
+/// get the encryption key
+///
+extern __xdata uint8_t *param_get_encryption_key();
+
+/// set the encryption key
+///
+extern bool param_set_encryption_key(__xdata unsigned char *key);
+
+/// Print hex codes
+///
+extern void print_encryption_key();
+#endif // INCLUDE_AES
