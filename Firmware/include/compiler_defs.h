@@ -125,9 +125,9 @@
 // SDCC - Small Device C Compiler
 // http://sdcc.sourceforge.net
 
-#if defined SDCC
+#if defined __SDCC
 
-#if (SDCC >= 300)
+#if (__SDCC_REVISION >= 300)
 
 #define interrupt __interrupt
 #define _asm __asm
