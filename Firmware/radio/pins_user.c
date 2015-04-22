@@ -301,7 +301,14 @@ pins_user_check()
 
     for(i=0;i<PIN_SEND_MAX;i++)
     {
-      pinStatePacket.pin_state |= (pins_user_get_adc(i)?1:0) << i;
+      if(param_get(PARAM_INVERT_PIN_LOGIC))
+      {
+        pinStatePacket.pin_state |= (pins_user_get_adc(i)?0:1) << i;
+      }
+      else
+      {
+        pinStatePacket.pin_state |= (pins_user_get_adc(i)?1:0) << i;
+      }
     }
     if (pinChange.pin_state != pinStatePacket.pin_state) {
       sendUpdateNow = true;
@@ -319,7 +326,14 @@ pins_user_check()
 //      {
 //        continue;
 //      }
-      pins_user_set_value(i, (pinStatePacket.pin_state & (1 << i))?1:0);
+      if(param_get(PARAM_INVERT_PIN_LOGIC))
+      {
+        pins_user_set_value(i, (pinStatePacket.pin_state & (1 << i))?PIN_LOW:PIN_HIGH);
+      }
+      else
+      {
+        pins_user_set_value(i, (pinStatePacket.pin_state & (1 << i))?PIN_HIGH:PIN_LOW);
+      }
     }
   }
   

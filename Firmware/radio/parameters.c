@@ -61,7 +61,7 @@ __code const struct parameter_info {
 	{"XX",              0},
 	{"TRANSMIT",        0},
 	{"CHANNEL",         1},
-	{"XX",              0},
+	{"INVERT_PIN_LOGIC",1},
 	{"MIN_FREQ",        0},
 	{"MAX_FREQ",        0},
 	{"NUM_CHANNELS",    0},
@@ -157,7 +157,8 @@ param_check(__pdata enum ParamID id, __data uint32_t val)
       }
       break;
       
-	case PARAM_TRANSMIT:
+  case PARAM_TRANSMIT:
+  case PARAM_INVERT_PIN_LOGIC:
 		// boolean 0/1 only
 		if (val > 1)
 			return false;

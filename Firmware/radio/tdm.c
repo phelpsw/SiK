@@ -185,9 +185,9 @@ link_update(void)
   }
   else
   {
-    LED_RADIO = LED_OFF;
+    LED_RADIO = !blink_state;
     LED_ACTIVITY = !blink_state;
-    pins_user_set_value(5, PIN_LOW);
+    pins_user_set_value(5, !blink_state);
     if(received_packet)
     {
       received_packet = false;

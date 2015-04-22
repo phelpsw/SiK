@@ -53,7 +53,7 @@ enum ParamID {
 	PARAM_TXPOWER,          // transmit power (dBm)
 	PARAM_TRANSMIT,         // this node transmits only
   PARAM_CHANNEL,          // channel to listen/transmitt on
-	PARAM_XX,
+	PARAM_INVERT_PIN_LOGIC, // Invert the logic on the incoming pins
 	PARAM_MIN_FREQ,         // min frequency in MHz
 	PARAM_MAX_FREQ,         // max frequency in MHz
 	PARAM_NUM_CHANNELS,     // number of hopping channels
