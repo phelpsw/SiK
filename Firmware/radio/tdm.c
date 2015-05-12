@@ -445,7 +445,8 @@ link_update(void)
 		unlock_count++;
 	}
 	
-	if (unlock_count < 6) {
+  // Unlock greater than second
+	if (unlock_count < 2) {
 		RADIO_LED(LED_ON);
 	} else {
 		sync_count = 0;

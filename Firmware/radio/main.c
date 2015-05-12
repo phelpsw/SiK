@@ -335,7 +335,7 @@ radio_init(void) __nonbanked
 	case FREQ_915:
 		freq_min = 915000000UL;
 		freq_max = 928000000UL;
-		txpower = 27;
+		txpower = 20;
 			num_fh_channels = MAX_FREQ_CHANNELS;
 		break;
 	default:
