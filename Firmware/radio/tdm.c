@@ -164,7 +164,7 @@ __pdata struct tdm_trailer trailer;
 /// buffer to hold a remote AT command before sending
 static __bit            send_at_command;
 static __pdata uint16_t send_at_command_to;
-static __pdata char remote_at_cmd[AT_CMD_MAXLEN + 1];
+static __xdata char remote_at_cmd[AT_CMD_MAXLEN + 1];
 
 // local nodeCount
 __pdata static uint16_t nodeCount;

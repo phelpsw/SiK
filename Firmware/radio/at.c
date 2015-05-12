@@ -37,6 +37,11 @@
 #include "tdm.h"
 #include "flash_layout.h"
 #include "at.h"
+#include "board.h"
+
+#ifdef INCLUDE_AES
+#include "AES/aes.h"
+#endif
 
 // canary data for ram wrap. It is in at.c as the compiler
 // assigns addresses in alphabetial order and we want this at a low
@@ -44,7 +49,7 @@
 __pdata uint8_t pdata_canary = 0x41;
 
 // AT command buffer
-__pdata char at_cmd[AT_CMD_MAXLEN + 1];
+__xdata char at_cmd[AT_CMD_MAXLEN + 1];
 __pdata uint8_t	at_cmd_len;
 
 // Index
@@ -65,7 +70,6 @@ static void	at_s(void);
 static void	at_ampersand(void);
 static void	at_p(void);
 static void	at_plus(void);
-static void at_tilde(void);
 
 #pragma save
 #pragma nooverlay
@@ -216,6 +220,7 @@ at_timer(void)
 }
 #pragma restore
 
+#ifdef INCLUDE_AES
 uint8_t read_hex_nibble(const uint8_t c) __reentrant __nonbanked
 {
     if ((c >='0') && (c <= '9'))
@@ -245,9 +250,9 @@ uint8_t read_hex_byte(const uint8_t *buf) __reentrant __nonbanked
     result += read_hex_nibble(buf[1]);
     return result;
 }
+#endif
 
-static uint32_t
-at_parse_number() __reentrant __nonbanked
+static uint32_t at_parse_number() __reentrant
 {
 	uint32_t	reg;
 	uint8_t		c;
@@ -328,7 +333,6 @@ at_command(void)
 			case 'S':
 				at_s();
 				break;
-
 			case 'Z':
 				// generate a software reset
 				RSTSRC |= (1 << 4);
@@ -349,13 +353,13 @@ at_command(void)
 static void
 at_ok(void) __nonbanked
 {
-	printf("[%u] OK\n", nodeId);
+  printf("[%u] OK\n", nodeId);
 }
 
 static void
 at_error(void) __nonbanked
 {
-	printf("[%u] ERROR\n", nodeId);
+  printf("[%u] ERROR\n", nodeId);
 }
 
 static void
@@ -408,7 +412,7 @@ at_i(void) __nonbanked
 }
 
 static void
-at_s(void) __nonbanked
+at_s(void)
 {
 	__pdata uint8_t		sreg;
 	__pdata uint32_t	val;
@@ -443,7 +447,7 @@ at_s(void) __nonbanked
 }
 
 static void
-at_ampersand(void) __nonbanked
+at_ampersand(void)
 {
 	switch (at_cmd[3]) {
 	case 'F':
@@ -488,7 +492,21 @@ at_ampersand(void) __nonbanked
 			at_error();
 		}
 		break;
-		
+#ifdef INCLUDE_AES
+  case 'E':
+    switch (at_cmd[4]) {
+      case '?':
+        print_encryption_key();
+        return;
+        
+      case '=':
+        if (param_set_encryption_key((__xdata unsigned char *)&at_cmd[5])) {
+          at_ok();
+          return;
+        }
+        break;
+    }
+#endif // INCLUDE_AES
 	default:
 		at_error();
 		break;
@@ -496,7 +514,7 @@ at_ampersand(void) __nonbanked
 }
 
 static void
-at_p (void) __nonbanked
+at_p (void)
 {
 #if PIN_MAX > 0
 	__pdata uint8_t pinId;
@@ -509,7 +527,7 @@ at_p (void) __nonbanked
 				printf("Output ");
 			else
 				printf("Input  ");
-			printf("Val: %d\n",pins_user_get_value(pinId));
+			printf("Val: %u\n",pins_user_get_value(pinId));
 		}
 		return;
 	}
@@ -520,19 +538,19 @@ at_p (void) __nonbanked
 	}
 	
 	pinId = at_cmd[5] - '0';
-
+	
 	switch (at_cmd[3]) {
 			
-		// Set pin to output, turn mirroring off pulling pin to ground
+			// Set pin to output, turn mirroring off pulling pin to ground
 		case 'O':
 			pins_user_set_io(pinId, PIN_OUTPUT);
 			break;
-
-		// Need to figure out how to set pins to Input/Output
+			
+			// Need to figure out how to set pins to Input/Output
 		case 'I':
 			pins_user_set_io(pinId, PIN_INPUT);
 			break;
-		
+			
 		case 'R':
 			if(pins_user_get_io(pinId) == PIN_INPUT)
 				printf("[%u] val:%u\n", nodeId, pins_user_get_adc(pinId));
@@ -542,7 +560,7 @@ at_p (void) __nonbanked
 			break;
 			
 		case 'C':
-			if(!isdigit(at_cmd[7]) || !pins_user_set_value(pinId, (at_cmd[7]-'0')))
+			if(!isdigit(at_cmd[7]) || !pins_user_set_value(pinId, (at_cmd[7]-'0')?1:0))
 			{
 				at_error();
 				return;
@@ -560,83 +578,74 @@ at_p (void) __nonbanked
 }
 
 static void
-at_plus(void) __nonbanked
+at_plus(void)
 {
-#if defined BOARD_rfd900a || defined INCLUDE_ENCRYPTION
-	__pdata uint8_t		creg;
-	__pdata uint32_t	val;
-
-	// get the register number first
-	idx = 4;
-	creg = at_parse_number();
-
-	switch (at_cmd[3])
-	{
-#ifdef BOARD_rfd900a
-	case 'P': // AT+P=x set power level pwm to x immediately
-		if (at_cmd[4] != '=')
-		{
-			break;
-		}
-		idx = 5;
-		val = at_parse_number();
-		PCA0CPH0 = val & 0xFF;
-		radio_set_diversity(false);
-		at_ok();
-		return;
-	case 'C': // AT+Cx=y write calibration value
-		switch (at_cmd[idx])
-		{
-		case '?':
-			val = calibration_get(creg);
-			printf("%lu\n",val);
-			return;
-		case '=':
-			idx++;
-			val = at_parse_number();
-			if (calibration_set(creg, val&0xFF))
-			{
-				at_ok();
-			} else {
-				at_error();
-			}
-			return;
-		}
-		break;
-	case 'L': // AT+L lock bootloader area if all calibrations written
-		if (calibration_lock())
-		{
-			at_ok();
-		} else {
-			at_error();
-		}
-		return;
-#endif // BOARD_rfd900a
-//#ifdef INCLUDE_ENCRYPTION
-//	case 'E': // AT+E= Encyrption key for the radio
-//			__pdata uint8_t		i=0;
-//			__pdata uint8_t		val = (uint8_t)(param_get(PARAM_ENCRYPTION)/8);
-//			
-//			if(at_cmd[4] != '=' || val == 0)
-//			{
-//				at_error();
-//				return;
-//			}
-//			printf("%d,%f",i,encryption_key);
-//			for(i=0; i<val; i++)
-//			{
-//				// The hex number starts on the 5th char
-//				// For each 8bits we need to read 2 chars
-//				EncryptionKey[i] = read_hex_byte(at_cmd+5+(i*2));
-//			}
-//			
-//			if(param_encryptkey_set(encryption_key))
-//			{
-//				at_ok();
-//				return;
-//			}
-//#endif // INCLUDE_ENCRYPTION
-	}
-#endif // BOARD_rfd900a || INCLUDE_ENCRYPTION
-	at_error();
+  __pdata uint8_t		creg;
+  __pdata uint32_t	at_num;
+  
+  // get the register number first
+  idx = 4;
+  creg = at_parse_number();
+  
+  switch (at_cmd[3])
+  {
+#if defined BOARD_rfd900a || defined BOARD_rfd900p
+  case 'P': // AT+P=x set power level pwm to x immediately
+    if (at_cmd[4] != '=')
+    {
+      break;
+    }
+    idx = 5;
+    at_num = at_parse_number();
+    PCA0CPH0 = at_num & 0xFF;
+    radio_set_diversity(DIVERSITY_DISABLED);
+    at_ok();
+    return;
+  case 'C': // AT+Cx=y write calibration value
+    switch (at_cmd[idx])
+    {
+    case '?':
+      at_num = calibration_get(creg);
+      printf("%lu\n",at_num);
+      return;
+    case '=':
+      idx++;
+      at_num = at_parse_number();
+      if (calibration_set(creg, at_num&0xFF))
+      {
+        at_ok();
+      } else {
+        at_error();
+      }
+      return;
+    }
+    break;
+  case 'L': // AT+L lock bootloader area if all calibrations written
+    if (calibration_lock())
+    {
+      at_ok();
+    } else {
+      at_error();
+    }
+    return;
+#endif //BOARD_rfd900a / BOARD_rfd900p
+#ifdef RFD900_DIVERSITY
+  case 'A':
+    if (at_cmd[4] != '=')
+    {
+      break;
+    }
+    idx = 5;
+    at_num = at_parse_number();
+    if (at_num == 1) {
+      radio_set_diversity(DIVERSITY_ANT1);
+    }
+    else {
+      radio_set_diversity(DIVERSITY_ANT2);
+    }
+    at_ok();
+    return;
+#endif // RFD900_DIVERSITY
+  }
+  at_error();
 }
