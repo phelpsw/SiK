@@ -585,7 +585,7 @@ at_plus(void)
   
   // get the register number first
   idx = 4;
-  creg = at_parse_number();
+  creg = at_num = at_parse_number();
   
   switch (at_cmd[3])
   {
