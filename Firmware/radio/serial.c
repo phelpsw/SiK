@@ -45,8 +45,8 @@
 // 8 TDM time slots
 //
 #ifdef CPU_SI1030 // Potential for a increase in buffer size..
-#define RX_BUFF_MAX 1024
-#define TX_BUFF_MAX 512
+#define RX_BUFF_MAX 2048
+#define TX_BUFF_MAX 1024
 #else
 #define RX_BUFF_MAX 1024 //2048
 #define TX_BUFF_MAX 512 //256 // 512
@@ -58,8 +58,6 @@ __xdata uint8_t tx_buf[TX_BUFF_MAX] = {0};
 // FIFO insert/remove pointers
 static volatile __pdata uint16_t				rx_insert, rx_remove;
 static volatile __pdata uint16_t				tx_insert, tx_remove;
-
-
 
 // flag indicating the transmitter is idle
 static volatile bool			tx_idle;
@@ -89,8 +87,8 @@ static volatile bool			tx_idle;
 #define BUF_PEEK2(_b)	_b##_buf[BUF_NEXT_REMOVE(_b)]
 #define BUF_PEEKX(_b, offset)	_b##_buf[(_b##_remove+offset) % sizeof(_b##_buf)]
 
-static void			_serial_write(register uint8_t c);
-static void			serial_restart(void);
+static void	_serial_write(register uint8_t c);
+static void	serial_restart(void);
 static void serial_device_set_speed(register uint8_t speed);
 
 // save and restore serial interrupt. We use this rather than
@@ -488,8 +486,7 @@ static const __code struct {
 bool 
 serial_device_valid_speed(register uint8_t speed)
 {
-	uint8_t i;
-	uint8_t num_rates = ARRAY_LENGTH(serial_rates);
+	__pdata uint8_t i, num_rates = ARRAY_LENGTH(serial_rates);
 
 	for (i = 0; i < num_rates; i++) {
 		if (speed == serial_rates[i].rate) {
@@ -502,8 +499,7 @@ serial_device_valid_speed(register uint8_t speed)
 static 
 void serial_device_set_speed(register uint8_t speed)
 {
-	uint8_t i;
-	uint8_t num_rates = ARRAY_LENGTH(serial_rates);
+	__pdata uint8_t i, num_rates = ARRAY_LENGTH(serial_rates);
 
 	if(!serial_device_valid_speed(speed))
 		speed = 57;
