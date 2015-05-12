@@ -67,8 +67,8 @@ enum ParamID {
         PARAM_NODEDESTINATION,// packet destination
         PARAM_SYNCANY,        // Let this node sync from any in the network not just the base
         PARAM_NODECOUNT,      // number of sequential nodes in the network
-#ifdef INCLUDE_ENCRYPTION
-		PARAM_ENCRYPTION,     // no Enycryption (0), 128 or 256 bit key
+#ifdef INCLUDE_AES
+        PARAM_ENCRYPTION,     // no Enycryption (0), 128 or 256 bit key
 #endif
         PARAM_MAX             // must be last
 };
@@ -138,14 +138,22 @@ extern void param_print(__data uint8_t id);
 /// convenient routine to constrain parameter values
 uint32_t constrain(__pdata uint32_t v, __pdata uint32_t min, __pdata uint32_t max);
 
-#ifdef INCLUDE_ENCRYPTION
-__xdata uint8_t* param_encryptkey_get(void);
-void param_encryptkey_set(__xdata uint8_t *key);
-extern SEGMENT_VARIABLE (EncryptionKey[32], U8, SEG_XDATA);
-#endif
-
 #if defined BOARD_rfd900a || defined BOARD_rfd900p
 extern bool calibration_set(uint8_t idx, uint8_t value) __reentrant;
 extern uint8_t calibration_get(uint8_t level) __reentrant;
 extern bool calibration_lock() __reentrant;
 #endif // BOARD_rfd900a
+
+#ifdef INCLUDE_AES
+/// get the encryption key
+///
+extern __xdata uint8_t *param_get_encryption_key();
+
+/// set the encryption key
+///
+extern bool param_set_encryption_key(__xdata unsigned char *key);
+
+/// Print hex codes
+///
+extern void print_encryption_key();
+#endif // INCLUDE_AES

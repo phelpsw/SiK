@@ -42,6 +42,10 @@
 #include "timer.h"
 #include "freq_hopping.h"
 
+#ifdef INCLUDE_AES
+#include "AES/aes.h"
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @name	Interrupt vector prototypes
 ///
@@ -66,6 +70,10 @@ extern void	T2_ISR(void)		__interrupt(INTERRUPT_TIMER2);
 /// @todo switch this and everything it calls to use another register bank?
 ///
 extern void	T3_ISR(void)		__interrupt(INTERRUPT_TIMER3);
+
+#ifdef INCLUDE_AES
+extern void    DMA_ISR(void)    __interrupt(INTERRUPT_DMA0);
+#endif // INCLUDE_AES
 
 //@}
 
@@ -130,10 +138,6 @@ main(void) __nonbanked
 		panic("failed to enable receiver");
 	}
 	
-#ifdef INCLUDE_ENCRYPTION
-	aesEncrypt_init();
-#endif // INCLUDE_ENCRYPTION
-	
 #if PIN_MAX > 0
 	// initialise pins for the user
 	pins_user_init();
@@ -146,6 +150,13 @@ main(void) __nonbanked
 	PCA0CPH5 = 0;
 #endif // WATCH_DOG_ENABLE
 	
+#ifdef INCLUDE_AES
+  // Initialise Encryption
+  if (! aes_init(param_get(PARAM_ENCRYPTION))) {
+    panic("failed to initialise aes");
+  }
+#endif // INCLUDE_AES
+  
 	tdm_serial_loop();
 }
 

@@ -220,38 +220,6 @@ at_timer(void)
 }
 #pragma restore
 
-#ifdef INCLUDE_AES
-uint8_t read_hex_nibble(const uint8_t c) __reentrant __nonbanked
-{
-    if ((c >='0') && (c <= '9'))
-    {
-        return c - '0';
-    }
-    else if ((c >='A') && (c <= 'F'))
-    {
-        return c - 'A' + 10;
-    }
-    else if ((c >='a') && (c <= 'f'))
-    {
-        return c - 'a' + 10;
-    }
-    else
-    {
-        printf("[%u] read_hex_nibble: Error char not in supported range",nodeId);
-        return 0;
-    }
-}
-
-uint8_t read_hex_byte(const uint8_t *buf) __reentrant __nonbanked
-{
-    uint8_t result;
-	
-    result = read_hex_nibble(buf[0]) << 4;
-    result += read_hex_nibble(buf[1]);
-    return result;
-}
-#endif
-
 static uint32_t at_parse_number() __reentrant
 {
 	uint32_t	reg;
