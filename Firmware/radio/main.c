@@ -114,6 +114,9 @@ main(void) __nonbanked
 	g_board_frequency = BOARD_FREQUENCY_REG;
 	g_board_bl_version = BOARD_BL_VERSION_REG;
 
+  // Do hardware initialisation.
+  hardware_init();
+  
 	// try to load parameters; set them to defaults if that fails.
 	// this is done before hardware_init() to get the serial speed
 	// XXX default parameter selection should be based on board info
@@ -121,17 +124,17 @@ main(void) __nonbanked
 	if (!param_load())
 		param_default();
 
+  // UART - set the configured speed
+  serial_init(param_get(PARAM_SERIAL_SPEED));
+
+  // do radio initialisation
+  radio_init();
+    
 	// setup boolean features
 	feature_mavlink_framing = param_get(PARAM_MAVLINK);
 	feature_opportunistic_resend = param_get(PARAM_OPPRESEND)?true:false;
 	feature_golay = param_get(PARAM_ECC)?true:false;
 	feature_rtscts = param_get(PARAM_RTSCTS)?true:false;
-	
-	// Do hardware initialisation.
-	hardware_init();
-	
-	// do radio initialisation
-	radio_init();
 	
 	// turn on the receiver
 	if (!radio_receiver_on()) {
@@ -268,22 +271,11 @@ hardware_init(void) __nonbanked
 	// initialise timers
 	timer_init();
 	
-	// UART - set the configured speed
-	serial_init(param_get(PARAM_SERIAL_SPEED));
-	
 	// set all interrupts to the same priority level
 	IP = 0;
 	
 	// global interrupt enable
 	EA = 1;
-	
-//#ifdef _BOARD_RFD900U
-//	SFRPAGE  = CONFIG_PAGE;
-//	P3MDOUT |= 0xC0;		/* Leds */
-//	P3DRV   |= 0xC0;		/* Leds */
-//	SFRPAGE  = LEGACY_PAGE;
-//	IT01CF	 = (IT01CF & 0xf) | 0x01;
-//#endif
 	
 	// Turn on the 'radio running' LED and turn off the bootloader LED
 	RADIO_LED(LED_ON);

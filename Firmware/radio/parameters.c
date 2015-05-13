@@ -39,7 +39,6 @@
 /// with an 8-bit XOR checksum appended to the end of the flash range.
 ///
 
-
 #include "radio.h"
 #include "tdm.h"
 #include "crc.h"
@@ -52,28 +51,28 @@
 /// In-ROM parameter info table.
 ///
 __code const struct parameter_info {
-	const char	*name;
-	param_t		default_value;
+  const char	*name;
+  param_t		default_value;
 } parameter_info[PARAM_MAX] = {
-	{"FORMAT", 		PARAM_FORMAT_CURRENT},
-	{"SERIAL_SPEED",	57}, // match APM default of 57600
-	{"AIR_SPEED",		64}, // relies on MAVLink flow control
-	{"NETID",			25},
-	{"TXPOWER",			0},
-	{"ECC",				0},
-	{"MAVLINK",			0},
-	{"OPPRESEND",		0},
-	{"MIN_FREQ",		0},
-	{"MAX_FREQ",		0},
-	{"NUM_CHANNELS",	0},
-	{"DUTY_CYCLE",		100},
-	{"LBT_RSSI",		0},
-	{"MANCHESTER",		0},
-	{"RTSCTS",			0},
-	{"NODEID",			1}, // The base node is '1' lets make new nodes 2
-	{"NODEDESTINATION",	65535},
-	{"SYNCANY",			0}, // The amount of nodes in the network, this may could become auto discovery later.
-	{"NODECOUNT",		2}, // The amount of nodes in the network, this may could become auto discovery later.
+  {"FORMAT", 		PARAM_FORMAT_CURRENT},
+  {"SERIAL_SPEED",	57}, // match APM default of 57600
+  {"AIR_SPEED",		64}, // relies on MAVLink flow control
+  {"NETID",			25},
+  {"TXPOWER",			0},
+  {"ECC",				0},
+  {"MAVLINK",			0},
+  {"OPPRESEND",		0},
+  {"MIN_FREQ",		0},
+  {"MAX_FREQ",		0},
+  {"NUM_CHANNELS",	0},
+  {"DUTY_CYCLE",		100},
+  {"LBT_RSSI",		0},
+  {"MANCHESTER",		0},
+  {"RTSCTS",			0},
+  {"NODEID",			1}, // The base node is '1' lets make new nodes 2
+  {"NODEDESTINATION",	65535},
+  {"SYNCANY",			0}, // The amount of nodes in the network, this may could become auto discovery later.
+  {"NODECOUNT",		2}, // The amount of nodes in the network, this may could become auto discovery later.
 #ifdef INCLUDE_AES
   {"ENCRYPTION_LEVEL", 0}, // no Enycryption (0), 128 or 256 bit key
 #endif
@@ -105,9 +104,11 @@ typedef char r2pCheck[(PARAM_FLASH_END < PIN_FLASH_START) ? 0 : -1];
 #define PIN_FLASH_END PARAM_FLASH_END
 #endif // PIN_MAX
 
+// Place the start away from the other params to allow for expantion 2<<7 +128 = 384
 #ifdef INCLUDE_AES
 // Holds the encrpytion string
 __xdata uint8_t encryption_key[32];
+
 #define PARAM_E_FLASH_START   (2<<7) + 128
 #define PARAM_E_FLASH_END     (PARAM_E_FLASH_START + sizeof(encryption_key) + 3)
 
@@ -116,6 +117,10 @@ typedef char p2eCheck[(PIN_FLASH_END < PARAM_E_FLASH_START) ? 0 : -1];
 #else
 #define PARAM_E_FLASH_END PIN_FLASH_END
 #endif // INCLUDE_AES
+
+
+// Check to make sure we dont overflow off the page
+typedef char endCheck[(PARAM_E_FLASH_END < 1023) ? 0 : -1];
 
 static bool
 param_check(__pdata enum ParamID id, __data uint32_t val)
@@ -262,36 +267,36 @@ param_set(__data enum ParamID param, __pdata param_t value)
 param_t
 param_get(__data enum ParamID param)
 {
-	if (param >= PARAM_MAX)
-		return 0;
-	return parameter_values[param];
+  if (param >= PARAM_MAX)
+    return 0;
+  return parameter_values[param];
 }
 
-bool read_params(__xdata uint8_t * __data input, uint8_t start, uint8_t size)
+bool read_params(__xdata uint8_t * __data input, uint16_t start, uint8_t size)
 {
-	__pdata uint8_t	i;
-	
-	for (i = start; i < start+size; i ++)
-		input[i-start] = flash_read_scratch(i);
-	
-	// verify checksum
-	if (crc16(size, input) != ((uint16_t) flash_read_scratch(i+1)<<8 | flash_read_scratch(i)))
-		return false;
-	return true;
+  uint16_t	i;
+  
+  for (i = start; i < start+size; i ++)
+    input[i-start] = flash_read_scratch(i);
+  
+  // verify checksum
+  if (crc16(size, input) != ((uint16_t) flash_read_scratch(i+1)<<8 | flash_read_scratch(i)))
+    return false;
+  return true;
 }
 
-void write_params(__xdata uint8_t * __data input, uint8_t start, uint8_t size)
+void write_params(__xdata uint8_t * __data input, uint16_t start, uint8_t size)
 {
-	__pdata uint16_t i, checksum;
-
-	// save parameters to the scratch page
-	for (i = start; i < start+size; i ++)
-		flash_write_scratch(i, input[i-start]);
-	
-	// write checksum
-	checksum = crc16(size, input);
-	flash_write_scratch(i, checksum&0xFF);
-	flash_write_scratch(i+1, checksum>>8);
+  uint16_t	i, checksum;
+  
+  // save parameters to the scratch page
+  for (i = start; i < start+size; i ++)
+    flash_write_scratch(i, input[i-start]);
+  
+  // write checksum
+  checksum = crc16(size, input);
+  flash_write_scratch(i, checksum&0xFF);
+  flash_write_scratch(i+1, checksum>>8);
 }
 
 bool
@@ -370,62 +375,62 @@ __critical {
 void
 param_default(void)
 {
-	__pdata uint8_t	i;
-	
-	// set all parameters to their default values
-	for (i = 0; i < PARAM_MAX; i++) {
-		parameter_values[i] = parameter_info[i].default_value;
-	}
-	
+  __pdata uint8_t	i;
+  
+  // set all parameters to their default values
+  for (i = 0; i < PARAM_MAX; i++) {
+    parameter_values[i] = parameter_info[i].default_value;
+  }
+  
 #if PIN_MAX > 0
-	for (i = 0; i < PIN_MAX; i ++) {
-		pin_values[i].node_mirror = pins_defaults.node_mirror;
-		pin_values[i].output = pins_defaults.output;
-		pin_values[i].pin_dir = pins_defaults.pin_dir;
-		pin_values[i].pin_mirror = pins_defaults.pin_mirror;
-	}
-#endif
+  for (i = 0; i < PIN_MAX; i ++) {
+    pin_values[i].node_mirror = pins_defaults.node_mirror;
+    pin_values[i].output = pins_defaults.output;
+    pin_values[i].pin_dir = pins_defaults.pin_dir;
+    pin_values[i].pin_mirror = pins_defaults.pin_mirror;
+  }
+#endif // PIN_MAX
 }
 
 enum ParamID
 param_id(__data char * __pdata name)
 {
-	__pdata uint8_t i;
-	
-	for (i = 0; i < PARAM_MAX; i++) {
-		if (!strcmp(name, parameter_info[i].name))
-			break;
-	}
-	return i;
+  __pdata uint8_t i;
+  
+  for (i = 0; i < PARAM_MAX; i++) {
+    if (!strcmp(name, parameter_info[i].name))
+      break;
+  }
+  return i;
 }
 
 void
 param_print(__data uint8_t	id)
 {
-	if (id < PARAM_MAX) {
-		printf("[%u] S%u: %s=%lu\n",
-			nodeId,
-			(unsigned)id,
-			parameter_info[id].name,
-			(unsigned long)parameter_values[id]);
-	}
+  if (id < PARAM_MAX) {
+    printf("[%u] S%u: %s=%lu\n",
+           nodeId,
+           (unsigned)id,
+           parameter_info[id].name,
+           (unsigned long)parameter_values[id]);
+  }
 }
 
 const char *__code
 param_name(__data enum ParamID param)
 {
-	if (param < PARAM_MAX) {
-		return parameter_info[param].name;
-	}
-	return 0;
+  if (param < PARAM_MAX) {
+    return parameter_info[param].name;
+  }
+  return 0;
 }
 
 // constraint for parameter values
 uint32_t constrain(__pdata uint32_t v, __pdata uint32_t min, __pdata uint32_t max)
 {
-	if (v < min) v = min;
-	if (v > max) v = max;
-	return v;
+  if (v < min) v = min;
+  if (v > max) v = max;
+  return v;
 }
 
 // rfd900a calibration stuff
@@ -437,18 +442,18 @@ static __at(FLASH_CALIBRATION_CRC) uint8_t __code calibration_crc;
 static void
 flash_write_byte(uint16_t address, uint8_t c) __reentrant __critical
 {
-	PSCTL = 0x01;				// set PSWE, clear PSEE
-	FLKEY = 0xa5;
-	FLKEY = 0xf1;
-	*(uint8_t __xdata *)address = c;	// write the byte
-	PSCTL = 0x00;				// disable PSWE/PSEE
+  PSCTL = 0x01;				// set PSWE, clear PSEE
+  FLKEY = 0xa5;
+  FLKEY = 0xf1;
+  *(uint8_t __xdata *)address = c;	// write the byte
+  PSCTL = 0x00;				// disable PSWE/PSEE
 }
 
 static uint8_t
 flash_read_byte(uint16_t address) __reentrant
 {
-	// will cause reset if the byte is in a locked page
-	return *(uint8_t __code *)address;
+  // will cause reset if the byte is in a locked page
+  return *(uint8_t __code *)address;
 }
 
 bool
@@ -458,71 +463,80 @@ calibration_set(uint8_t idx, uint8_t value) __reentrant
   PSBANK = 0x33;
 #endif
   
-	// if level is valid
-	if (idx <= BOARD_MAXTXPOWER && value != 0xFF)
-	{
-		// if the target byte isn't yet written
-		if (flash_read_byte(FLASH_CALIBRATION_AREA_HIGH + idx) == 0xFF)
-		{
-			flash_write_byte(FLASH_CALIBRATION_AREA_HIGH + idx, value);
-			return true;
-		}
-	}
-	return false;
+  // if level is valid
+  if (idx <= BOARD_MAXTXPOWER && value != 0xFF)
+  {
+    // if the target byte isn't yet written
+    if (flash_read_byte(FLASH_CALIBRATION_AREA_HIGH + idx) == 0xFF)
+    {
+      flash_write_byte(FLASH_CALIBRATION_AREA_HIGH + idx, value);
+      return true;
+    }
+  }
+  return false;
 }
 
 uint8_t
 calibration_get(uint8_t level) __reentrant
 {
-  uint8_t idx, crc = 0;
-
+  uint8_t idx;
+  uint8_t crc = 0;
+  
 #ifdef CPU_SI1030
   PSBANK = 0x33;
 #endif
   
-	for (idx = 0; idx < FLASH_CALIBRATION_AREA_SIZE; idx++)
-	{
-		crc ^= calibration[idx];
-	}
+  // Change for next board revision
+  for (idx = 0; idx < FLASH_CALIBRATION_AREA_SIZE; idx++)
+  {
+    crc ^= calibration[idx];
+  }
   
-	if (calibration_crc != 0xFF && calibration_crc == crc && level <= BOARD_MAXTXPOWER)
-	{
-		return calibration[level];
-	}
-	return 0xFF;
+  if (calibration_crc != 0xFF && calibration_crc == crc && level <= BOARD_MAXTXPOWER)
+  {
+    return calibration[level];
+  }
+  return 0xFF;
+}
+
+uint8_t
+calibration_force_get(uint8_t level) __reentrant
+{
+  return flash_read_byte(FLASH_CALIBRATION_AREA_HIGH + level); //calibration[level];
 }
 
 bool
 calibration_lock() __reentrant
 {
-  uint8_t idx, crc = 0;
-
+  uint8_t idx;
+  uint8_t crc = 0;
+  
 #ifdef CPU_SI1030
   PSBANK = 0x33;
 #endif
   
-	// check that all entries are written
-	if (flash_read_byte(FLASH_CALIBRATION_CRC_HIGH) == 0xFF)
-	{
-		for (idx=0; idx < FLASH_CALIBRATION_AREA_SIZE; idx++)
-		{
-			uint8_t cal = flash_read_byte(FLASH_CALIBRATION_AREA_HIGH + idx);
-			crc ^= cal;
-			if (cal == 0xFF)
-			{
-				printf("dBm level %u not calibrated\n",idx);
-				return false;
-			}
-		}
-		
-		// write crc
-		flash_write_byte(FLASH_CALIBRATION_CRC_HIGH, crc);
-		// lock the first and last pages
-		// can only be reverted by reflashing the bootloader
-		flash_write_byte(FLASH_LOCK_BYTE, 0xFE);
-		return true;
-	}
-	return false;
+  // check that all entries are written
+  if (flash_read_byte(FLASH_CALIBRATION_CRC_HIGH) == 0xFF)
+  {
+    for (idx=0; idx < FLASH_CALIBRATION_AREA_SIZE; idx++)
+    {
+      uint8_t cal = flash_read_byte(FLASH_CALIBRATION_AREA_HIGH + idx);
+      crc ^= cal;
+      if (cal == 0xFF)
+      {
+        printf("dBm level %u not calibrated\n",idx);
+        return false;
+      }
+    }
+    
+    // write crc
+    flash_write_byte(FLASH_CALIBRATION_CRC_HIGH, crc);
+    // lock the first and last pages
+    // can only be reverted by reflashing the bootloader
+    flash_write_byte(FLASH_LOCK_BYTE, 0xFE);
+    return true;
+  }
+  return false;
 }
 #endif // BOARD_rfd900a/p
 
